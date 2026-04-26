@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Bar, BarChart, CartesianGrid, Cell,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts'
 import api from '../utils/api'
 
 const USER_ID = 1 // placeholder until auth is implemented
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const ALL_STATUSES = ['draft', 'applied', 'interviewing', 'rejected', 'offer']
 
 const STATUS_STYLES = {
   draft:        'bg-[var(--color-surface-2)] text-[var(--color-muted)]',
@@ -12,29 +20,25 @@ const STATUS_STYLES = {
   offer:        'bg-[var(--color-success)]/10 text-[var(--color-success)]',
 }
 
-function StatusBadge({ status }) {
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[status] ?? STATUS_STYLES.draft}`}>
-      {status}
-    </span>
-  )
+function fitColor(score) {
+  if (score == null) return 'var(--color-muted)'
+  if (score >= 70)   return 'var(--color-success)'
+  if (score >= 40)   return 'var(--color-accent)'
+  return 'var(--color-danger)'
 }
 
-function ScoreRing({ score }) {
-  if (score == null) return <span className="text-[var(--color-muted)] text-sm">—</span>
-  const color = score >= 70 ? 'var(--color-success)' : score >= 45 ? 'var(--color-accent)' : 'var(--color-danger)'
-  return (
-    <span className="text-sm font-semibold tabular-nums" style={{ color }}>
-      {Math.round(score)}
-    </span>
-  )
-}
+// ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [apps, setApps] = useState([])
+  const [apps, setApps]     = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError]   = useState('')
+
+  // filter + sort state
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortField, setSortField]       = useState('created_at')
+  const [sortDir, setSortDir]           = useState('desc')
 
   useEffect(() => {
     api.get(`/applications?user_id=${USER_ID}`)
@@ -43,43 +47,195 @@ export default function DashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // ── derived stats ────────────────────────────────────────────────────────────
+
+  const stats = useMemo(() => {
+    const scored = apps.filter((a) => a.fit_score != null)
+    const avg = scored.length
+      ? Math.round(scored.reduce((s, a) => s + a.fit_score, 0) / scored.length)
+      : null
+    const byStatus = Object.fromEntries(
+      ALL_STATUSES.map((s) => [s, apps.filter((a) => a.status === s).length])
+    )
+    return { total: apps.length, avg, byStatus }
+  }, [apps])
+
+  // chart: last 10 apps that have a fit score, in chronological order
+  const chartData = useMemo(() => {
+    return [...apps]
+      .filter((a) => a.fit_score != null)
+      .slice(0, 10)
+      .reverse()
+      .map((a) => ({
+        name: a.company_name.length > 12 ? a.company_name.slice(0, 11) + '…' : a.company_name,
+        score: Math.round(a.fit_score),
+        color: fitColor(a.fit_score),
+      }))
+  }, [apps])
+
+  // ── filtered + sorted rows ───────────────────────────────────────────────────
+
+  const rows = useMemo(() => {
+    let list = statusFilter === 'all'
+      ? [...apps]
+      : apps.filter((a) => a.status === statusFilter)
+
+    list.sort((a, b) => {
+      if (sortField === 'fit_score') {
+        const av = a.fit_score ?? -1
+        const bv = b.fit_score ?? -1
+        return sortDir === 'asc' ? av - bv : bv - av
+      }
+      // created_at
+      const av = new Date(a.created_at).getTime()
+      const bv = new Date(b.created_at).getTime()
+      return sortDir === 'asc' ? av - bv : bv - av
+    })
+    return list
+  }, [apps, statusFilter, sortField, sortDir])
+
+  function toggleSort(field) {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortField(field)
+      setSortDir('desc')
+    }
+  }
+
+  // ── loading ──────────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24 text-[var(--color-muted)] text-sm">
-        Loading…
+      <div className="flex items-center justify-center py-32 gap-3 text-[var(--color-muted)] text-sm">
+        <Spinner /> Loading applications…
       </div>
     )
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text)]">My Applications</h1>
-          <p className="text-sm text-[var(--color-muted)] mt-1">
-            {apps.length} application{apps.length !== 1 ? 's' : ''}
+  // ── empty state ──────────────────────────────────────────────────────────────
+
+  if (!error && apps.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader navigate={navigate} />
+        <div className="rounded-xl border border-dashed border-[var(--color-border)] py-24 text-center space-y-4">
+          <p className="text-4xl">📭</p>
+          <p className="font-semibold text-[var(--color-text)]">No applications yet</p>
+          <p className="text-sm text-[var(--color-muted)] max-w-xs mx-auto">
+            Generate your first tailored application and it will appear here.
           </p>
-        </div>
-        <button
-          onClick={() => navigate('/apply')}
-          className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
-        >
-          + New
-        </button>
-      </div>
-
-      {error && (
-        <p className="text-sm text-[var(--color-danger)]">{error}</p>
-      )}
-
-      {apps.length === 0 && !error ? (
-        <div className="rounded-xl border border-dashed border-[var(--color-border)] p-16 text-center">
-          <p className="text-[var(--color-muted)] text-sm">No applications yet.</p>
           <button
             onClick={() => navigate('/apply')}
-            className="mt-4 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-muted)] text-sm text-[var(--color-text)] transition-colors"
+            className="mt-2 px-5 py-2.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
           >
-            Create your first application →
+            Start a New Application →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── main ─────────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-8">
+
+      <PageHeader navigate={navigate} />
+
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 text-sm text-[var(--color-danger)]">
+          <WarningIcon /> {error}
+        </div>
+      )}
+
+      {/* ── stats bar ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Total" value={stats.total} />
+        <StatCard
+          label="Avg Fit Score"
+          value={stats.avg != null ? stats.avg : '—'}
+          valueColor={stats.avg != null ? fitColor(stats.avg) : undefined}
+        />
+        <StatCard label="Applied"      value={stats.byStatus.applied}      accent="blue" />
+        <StatCard label="Interviewing" value={stats.byStatus.interviewing} accent="orange" />
+        <StatCard label="Offers"       value={stats.byStatus.offer}        accent="green" />
+        <StatCard label="Rejected"     value={stats.byStatus.rejected}     accent="red" />
+      </div>
+
+      {/* ── chart ── */}
+      {chartData.length > 0 && (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--color-border)]">
+            <h2 className="text-sm font-semibold text-[var(--color-text)]">Fit Scores</h2>
+            <p className="text-xs text-[var(--color-muted)] mt-0.5">Last {chartData.length} scored applications</p>
+          </div>
+          <div className="p-5 h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barCategoryGap="30%">
+                <CartesianGrid
+                  vertical={false}
+                  stroke="var(--color-border)"
+                  strokeDasharray="3 3"
+                />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  ticks={[0, 25, 50, 75, 100]}
+                  tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={28}
+                />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
+                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} fillOpacity={0.85} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* ── table controls ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-sm text-[var(--color-muted)]">
+          {rows.length} of {apps.length} application{apps.length !== 1 ? 's' : ''}
+          {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
+        </p>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-[var(--color-muted)]">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-colors cursor-pointer"
+          >
+            <option value="all">All</option>
+            {ALL_STATUSES.map((s) => (
+              <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* ── table ── */}
+      {rows.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[var(--color-border)] py-12 text-center">
+          <p className="text-sm text-[var(--color-muted)]">
+            No applications with status "{statusFilter}".
+          </p>
+          <button
+            onClick={() => setStatusFilter('all')}
+            className="mt-3 text-xs text-[var(--color-accent)] hover:underline"
+          >
+            Clear filter
           </button>
         </div>
       ) : (
@@ -87,31 +243,69 @@ export default function DashboardPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--color-border)]">
-                {['Company', 'Role', 'Fit', 'Status', 'Date'].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-5 py-3 text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider"
-                  >
-                    {h}
-                  </th>
-                ))}
+                <Th>Company</Th>
+                <Th>Job Title</Th>
+                <SortTh
+                  label="Fit Score"
+                  field="fit_score"
+                  active={sortField}
+                  dir={sortDir}
+                  onSort={toggleSort}
+                />
+                <Th>Status</Th>
+                <SortTh
+                  label="Date"
+                  field="created_at"
+                  active={sortField}
+                  dir={sortDir}
+                  onSort={toggleSort}
+                />
+                <Th align="right">Actions</Th>
               </tr>
             </thead>
             <tbody>
-              {apps.map((app, i) => (
+              {rows.map((app, i) => (
                 <tr
                   key={app.id}
-                  onClick={() => navigate(`/applications/${app.id}`)}
-                  className={`cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors ${
-                    i < apps.length - 1 ? 'border-b border-[var(--color-border)]' : ''
+                  className={`hover:bg-[var(--color-surface-2)] transition-colors ${
+                    i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
                   }`}
                 >
-                  <td className="px-5 py-4 font-medium text-[var(--color-text)]">{app.company_name}</td>
-                  <td className="px-5 py-4 text-[var(--color-muted)]">{app.job_title}</td>
-                  <td className="px-5 py-4"><ScoreRing score={app.fit_score} /></td>
-                  <td className="px-5 py-4"><StatusBadge status={app.status} /></td>
-                  <td className="px-5 py-4 text-[var(--color-muted)] tabular-nums">
-                    {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px] truncate">
+                    {app.company_name}
+                  </td>
+                  <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
+                    {app.job_title}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {app.fit_score != null ? (
+                      <span
+                        className="text-sm font-semibold tabular-nums"
+                        style={{ color: fitColor(app.fit_score) }}
+                      >
+                        {Math.round(app.fit_score)}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--color-muted)]">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
+                      {app.status}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
+                    {new Date(app.created_at).toLocaleDateString('en-GB', {
+                      day: 'numeric', month: 'short', year: 'numeric',
+                    })}
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <button
+                      onClick={() => navigate(`/applications/${app.id}`)}
+                      className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                    >
+                      View →
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -119,6 +313,105 @@ export default function DashboardPage() {
           </table>
         </div>
       )}
+
     </div>
+  )
+}
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+function PageHeader({ navigate }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--color-text)]">Dashboard</h1>
+        <p className="text-sm text-[var(--color-muted)] mt-1">Track and manage your applications</p>
+      </div>
+      <button
+        onClick={() => navigate('/apply')}
+        className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
+      >
+        + New Application
+      </button>
+    </div>
+  )
+}
+
+const ACCENT_COLORS = {
+  blue:   { text: 'text-blue-400',                   border: 'border-blue-500/20',                   bg: 'bg-blue-500/5' },
+  orange: { text: 'text-[var(--color-accent)]',       border: 'border-[var(--color-accent)]/20',       bg: 'bg-[var(--color-accent)]/5' },
+  green:  { text: 'text-[var(--color-success)]',      border: 'border-[var(--color-success)]/20',      bg: 'bg-[var(--color-success)]/5' },
+  red:    { text: 'text-[var(--color-danger)]',       border: 'border-[var(--color-danger)]/20',       bg: 'bg-[var(--color-danger)]/5' },
+}
+
+function StatCard({ label, value, valueColor, accent }) {
+  const ac = accent ? ACCENT_COLORS[accent] : null
+  return (
+    <div className={`rounded-xl border p-4 space-y-1 ${
+      ac
+        ? `${ac.bg} ${ac.border}`
+        : 'border-[var(--color-border)] bg-[var(--color-surface)]'
+    }`}>
+      <p className="text-xs text-[var(--color-muted)] font-medium">{label}</p>
+      <p
+        className={`text-2xl font-black tabular-nums ${ac ? ac.text : 'text-[var(--color-text)]'}`}
+        style={valueColor ? { color: valueColor } : undefined}
+      >
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function Th({ children, align = 'left' }) {
+  return (
+    <th className={`px-5 py-3 text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider text-${align}`}>
+      {children}
+    </th>
+  )
+}
+
+function SortTh({ label, field, active, dir, onSort }) {
+  const isActive = active === field
+  return (
+    <th
+      className="px-5 py-3 text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider cursor-pointer select-none hover:text-[var(--color-text)] transition-colors"
+      onClick={() => onSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        <span className={isActive ? 'text-[var(--color-accent)]' : 'opacity-30'}>
+          {isActive && dir === 'asc' ? '↑' : '↓'}
+        </span>
+      </span>
+    </th>
+  )
+}
+
+function ChartTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const { name, score, color } = payload[0].payload
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 shadow-xl text-xs">
+      <p className="text-[var(--color-muted)] mb-1">{name}</p>
+      <p className="font-bold tabular-nums" style={{ color }}>{score} / 100</p>
+    </div>
+  )
+}
+
+function Spinner({ size = 16 }) {
+  return (
+    <svg style={{ width: size, height: size }} className="animate-spin text-[var(--color-accent)]" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+    </svg>
+  )
+}
+
+function WarningIcon() {
+  return (
+    <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+    </svg>
   )
 }
