@@ -9,14 +9,14 @@ load_dotenv()
 
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-_CV_SYSTEM = (
+_CV_SYSTEM_BASE = (
     "You are an expert CV writer and career coach. "
     "You rewrite CVs to better match specific job descriptions without fabricating experience. "
     "You preserve the original structure and format exactly, only adjusting wording, ordering of bullets, "
     "and emphasis to highlight relevant skills. Return plain text only — no markdown, no commentary."
 )
 
-_COVER_LETTER_SYSTEM = (
+_COVER_LETTER_SYSTEM_BASE = (
     "You are an expert cover letter writer. "
     "You write concise, compelling cover letters that feel personal and specific — never generic. "
     "Structure: three paragraphs only — (1) a strong hook referencing the role and why this candidate, "
@@ -24,6 +24,38 @@ _COVER_LETTER_SYSTEM = (
     "(3) a confident close that references the company specifically. "
     "Return plain text only — no subject line, no date, no address block, no markdown."
 )
+
+_KNOWN_PREFERENCE_KEYS = {
+    "preferred_tone",
+    "target_roles",
+    "target_industries",
+    "writing_style",
+    "seniority_level",
+}
+
+
+def _build_preference_block(preferences: Optional[dict]) -> str:
+    """Render non-empty preferences as a compact instruction string."""
+    if not preferences:
+        return ""
+    relevant = {k: v for k, v in preferences.items() if k in _KNOWN_PREFERENCE_KEYS}
+    if not relevant:
+        return ""
+    lines = ["User preferences to apply:"]
+    for key, value in relevant.items():
+        label = key.replace("_", " ").capitalize()
+        if isinstance(value, list):
+            lines.append(f"  {label}: {', '.join(str(v) for v in value)}")
+        else:
+            lines.append(f"  {label}: {value}")
+    return "\n".join(lines)
+
+
+def _build_system(base: str, preferences: Optional[dict]) -> str:
+    pref_block = _build_preference_block(preferences)
+    if not pref_block:
+        return base
+    return f"{base}\n\n{pref_block}"
 
 
 def _format_fit_summary(fit_analysis: dict) -> str:
@@ -78,6 +110,7 @@ def write_application(
     job_description: str,
     fit_analysis: dict,
     company_research: Optional[dict] = None,
+    user_preferences: Optional[dict] = None,
 ) -> dict:
     """Rewrite a CV and draft a cover letter tailored to a specific role.
 
@@ -85,6 +118,8 @@ def write_application(
     """
     fit_summary = _format_fit_summary(fit_analysis)
     company_context = _format_company_context(company_research)
+    cv_system = _build_system(_CV_SYSTEM_BASE, user_preferences)
+    cover_system = _build_system(_COVER_LETTER_SYSTEM_BASE, user_preferences)
 
     # --- Call 1: tailored CV ---
     cv_prompt = f"""\
@@ -105,7 +140,7 @@ RULES:
 --- JOB DESCRIPTION ---
 {job_description}
 """
-    tailored_cv = _call_claude(_CV_SYSTEM, cv_prompt, max_tokens=4096)
+    tailored_cv = _call_claude(cv_system, cv_prompt, max_tokens=4096)
 
     # --- Call 2: cover letter ---
     cover_prompt = f"""\
@@ -129,7 +164,7 @@ RULES:
 --- JOB DESCRIPTION ---
 {job_description}
 """
-    cover_letter = _call_claude(_COVER_LETTER_SYSTEM, cover_prompt, max_tokens=1024)
+    cover_letter = _call_claude(cover_system, cover_prompt, max_tokens=1024)
 
     return {
         "tailored_cv": tailored_cv,

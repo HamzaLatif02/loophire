@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from agents.fit_agent import analyse_fit
 from agents.writer_agent import write_application
 from database import get_db
+from services.memory_service import get_preferences
 from services.research_service import research_company
 from models.application import Application, ApplicationStatus
 from models.user import User
@@ -57,12 +58,15 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
     except (RuntimeError, ValueError):
         company_research = None
 
+    user_preferences = get_preferences(body.user_id)
+
     try:
         written = write_application(
             cv_text=user.base_cv_text,
             job_description=body.job_description,
             fit_analysis=fit_analysis,
             company_research=company_research,
+            user_preferences=user_preferences or None,
         )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"Document generation failed: {exc}")
