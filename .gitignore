@@ -33,6 +33,5 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Alembic
-backend/migrations/versions/*.py
-!backend/migrations/versions/.gitkeep
+# Alembic — track all migration scripts
+backend/migrations/versions/__pycache__/

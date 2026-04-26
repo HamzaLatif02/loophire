@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 load_dotenv()
 
 from database import Base  # noqa: E402
+import models  # noqa: F401 — registers all ORM models on Base.metadata
 
 config = context.config
 
