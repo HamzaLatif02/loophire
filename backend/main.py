@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from routers import applications as applications_router
 from routers import cv as cv_router
 
 app = FastAPI(title="Loophire API")
@@ -14,6 +15,7 @@ app.add_middleware(
 )
 
 app.include_router(cv_router.router)
+app.include_router(applications_router.router)
 
 
 @app.get("/api/health")
