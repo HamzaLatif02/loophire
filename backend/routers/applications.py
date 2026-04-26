@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from agents.fit_agent import analyse_fit
 from agents.writer_agent import write_application
 from database import get_db
+from services.research_service import research_company
 from models.application import Application, ApplicationStatus
 from models.user import User
 from schemas.application import (
@@ -52,11 +53,16 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
         raise HTTPException(status_code=502, detail=f"Fit analysis failed: {exc}")
 
     try:
+        company_research = research_company(body.company_name)
+    except (RuntimeError, ValueError):
+        company_research = None
+
+    try:
         written = write_application(
             cv_text=user.base_cv_text,
             job_description=body.job_description,
             fit_analysis=fit_analysis,
-            company_research=None,
+            company_research=company_research,
         )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"Document generation failed: {exc}")
@@ -68,6 +74,7 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
         job_description=body.job_description,
         fit_score=fit_analysis.get("fit_score"),
         keyword_gaps=fit_analysis.get("keyword_gaps"),
+        company_research=company_research,
         tailored_cv=written["tailored_cv"],
         cover_letter=written["cover_letter"],
         status=ApplicationStatus.draft,
