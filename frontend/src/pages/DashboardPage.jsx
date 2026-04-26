@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ErrorBanner from '../components/ErrorBanner'
+import Spinner from '../components/Spinner'
 import {
   Bar, BarChart, CartesianGrid, Cell,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -43,7 +45,7 @@ export default function DashboardPage() {
   useEffect(() => {
     api.get(`/applications?user_id=${USER_ID}`)
       .then((r) => setApps(r.data))
-      .catch(() => setError('Failed to load applications.'))
+      .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Failed to load applications.'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -108,7 +110,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32 gap-3 text-[var(--color-muted)] text-sm">
-        <Spinner /> Loading applications…
+        <Spinner size={18} /> Loading applications…
       </div>
     )
   }
@@ -143,11 +145,7 @@ export default function DashboardPage() {
 
       <PageHeader navigate={navigate} />
 
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 text-sm text-[var(--color-danger)]">
-          <WarningIcon /> {error}
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} />
 
       {/* ── stats bar ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -399,19 +397,3 @@ function ChartTooltip({ active, payload }) {
   )
 }
 
-function Spinner({ size = 16 }) {
-  return (
-    <svg style={{ width: size, height: size }} className="animate-spin text-[var(--color-accent)]" viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-    </svg>
-  )
-}
-
-function WarningIcon() {
-  return (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-    </svg>
-  )
-}

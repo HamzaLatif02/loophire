@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import ErrorBanner from '../components/ErrorBanner'
+import Spinner from '../components/Spinner'
 import api from '../utils/api'
 
 const USER_ID = 1 // placeholder until auth is implemented
@@ -54,7 +56,7 @@ export default function ApplicationDetailPage() {
   useEffect(() => {
     api.get(`/applications/${id}?user_id=${USER_ID}`)
       .then((r) => setApp(r.data))
-      .catch(() => setError('Application not found.'))
+      .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Application not found.'))
       .finally(() => setLoading(false))
   }, [id])
 
@@ -86,7 +88,7 @@ export default function ApplicationDetailPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-3">
-        <Spinner />
+        <Spinner size={24} />
         <p className="text-sm text-[var(--color-muted)]">Loading application…</p>
       </div>
     )
@@ -94,8 +96,8 @@ export default function ApplicationDetailPage() {
 
   if (error || !app) {
     return (
-      <div className="py-32 text-center space-y-4">
-        <p className="text-[var(--color-danger)] text-sm">{error || 'Not found'}</p>
+      <div className="py-32 max-w-md mx-auto space-y-4">
+        <ErrorBanner message={error || 'Application not found.'} />
         <button
           onClick={() => navigate('/applications')}
           className="text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
@@ -462,16 +464,3 @@ function SectionCard({ title, accent = 'default', children }) {
   )
 }
 
-function Spinner({ size = 18 }) {
-  return (
-    <svg
-      style={{ width: size, height: size }}
-      className="animate-spin text-[var(--color-accent)]"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-    </svg>
-  )
-}

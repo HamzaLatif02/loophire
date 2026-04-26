@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import re
+import time
 from typing import Optional
 
 import anthropic
@@ -9,6 +11,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger("loophire.services.research")
+
+_MODEL = "claude-opus-4-7"
 _TAVILY_URL = "https://api.tavily.com/search"
 _TAVILY_KEY = os.getenv("TAVILY_API_KEY", "")
 _anthropic = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -41,9 +46,11 @@ If information for a field is absent from the search results, use an empty list 
 def _tavily_search(query: str, max_results: int = 5) -> list:
     """Run a single Tavily search and return a flat list of result dicts."""
     if not _TAVILY_KEY:
+        logger.debug("research: TAVILY_API_KEY not set — skipping search for %r", query)
         return []
 
     try:
+        t0 = time.monotonic()
         response = httpx.post(
             _TAVILY_URL,
             json={
@@ -56,8 +63,14 @@ def _tavily_search(query: str, max_results: int = 5) -> list:
             timeout=15.0,
         )
         response.raise_for_status()
-        return response.json().get("results", [])
-    except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+        results = response.json().get("results", [])
+        logger.info(
+            "research: Tavily search %r → %d results in %.1fs",
+            query, len(results), time.monotonic() - t0,
+        )
+        return results
+    except (httpx.HTTPError, httpx.TimeoutException, ValueError) as exc:
+        logger.warning("research: Tavily search failed for %r: %s", query, exc)
         return []
 
 
@@ -114,9 +127,15 @@ def research_company(company_name: str) -> Optional[dict]:
         search_results=formatted,
     )
 
+    logger.info(
+        "research: calling %s for %r synthesis (%d unique results)",
+        _MODEL, company_name, len(unique_results),
+    )
+    t0 = time.monotonic()
+
     try:
         with _anthropic.messages.stream(
-            model="claude-opus-4-7",
+            model=_MODEL,
             max_tokens=1024,
             thinking={"type": "adaptive"},
             system=[
@@ -130,15 +149,29 @@ def research_company(company_name: str) -> Optional[dict]:
         ) as stream:
             message = stream.get_final_message()
     except anthropic.APIError as exc:
+        logger.error("research: API error after %.1fs: %s", time.monotonic() - t0, exc)
         raise RuntimeError(f"Claude API error during research synthesis: {exc}") from exc
+
+    elapsed = time.monotonic() - t0
+    usage = message.usage
+    logger.info(
+        "research: synthesis completed in %.1fs — input_tokens=%d output_tokens=%d cache_read=%d",
+        elapsed,
+        usage.input_tokens,
+        usage.output_tokens,
+        getattr(usage, "cache_read_input_tokens", 0),
+    )
 
     text_blocks = [block.text for block in message.content if block.type == "text"]
     raw = "\n".join(text_blocks).strip()
     cleaned = _strip_fences(raw)
 
     try:
-        return json.loads(cleaned)
+        result = json.loads(cleaned)
+        logger.info("research: parsed research for %r successfully", company_name)
+        return result
     except json.JSONDecodeError as exc:
+        logger.error("research: JSON parse failed: %s\nRaw: %.200s", exc, raw)
         raise ValueError(
             f"Claude returned invalid JSON for research: {exc}\nRaw: {raw}"
         ) from exc

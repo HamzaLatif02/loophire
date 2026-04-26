@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ErrorBanner from '../components/ErrorBanner'
+import Spinner from '../components/Spinner'
 import api from '../utils/api'
 
 const USER_ID = 1 // placeholder until auth is implemented
@@ -51,7 +53,7 @@ export default function HomePage() {
       setCharCount(res.data.characters)
       setFileName(file.name)
     } catch (err) {
-      setError(err.response?.data?.detail ?? 'Upload failed — please try again.')
+      setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Upload failed — please try again.')
     } finally {
       setUploading(false)
     }
@@ -200,15 +202,7 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* error */}
-              {error && (
-                <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 text-sm text-[var(--color-danger)]">
-                  <svg className="w-4 h-4 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  {error}
-                </div>
-              )}
+              <ErrorBanner message={error} onDismiss={() => setError('')} />
 
               {/* upload button */}
               <button
@@ -246,20 +240,6 @@ export default function HomePage() {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-function Spinner({ size = 20 }) {
-  return (
-    <svg
-      style={{ width: size, height: size }}
-      className="animate-spin text-[var(--color-accent)]"
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-    </svg>
-  )
-}
 
 function PdfIcon({ muted = false }) {
   return (

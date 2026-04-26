@@ -1,5 +1,6 @@
-import json
+import logging
 import os
+import time
 from typing import Optional
 
 import anthropic
@@ -7,6 +8,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger("loophire.agents.writer")
+
+_MODEL = "claude-opus-4-7"
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 _CV_SYSTEM_BASE = (
@@ -35,7 +39,6 @@ _KNOWN_PREFERENCE_KEYS = {
 
 
 def _build_preference_block(preferences: Optional[dict]) -> str:
-    """Render non-empty preferences as a compact instruction string."""
     if not preferences:
         return ""
     relevant = {k: v for k, v in preferences.items() if k in _KNOWN_PREFERENCE_KEYS}
@@ -53,9 +56,7 @@ def _build_preference_block(preferences: Optional[dict]) -> str:
 
 def _build_system(base: str, preferences: Optional[dict]) -> str:
     pref_block = _build_preference_block(preferences)
-    if not pref_block:
-        return base
-    return f"{base}\n\n{pref_block}"
+    return f"{base}\n\n{pref_block}" if pref_block else base
 
 
 def _format_fit_summary(fit_analysis: dict) -> str:
@@ -82,10 +83,13 @@ def _format_company_context(company_research: Optional[dict]) -> str:
     return "\n".join(lines)
 
 
-def _call_claude(system_text: str, user_prompt: str, max_tokens: int) -> str:
+def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int) -> str:
+    logger.info("writer_agent[%s]: calling %s (max_tokens=%d)", label, _MODEL, max_tokens)
+    t0 = time.monotonic()
+
     try:
         with _client.messages.stream(
-            model="claude-opus-4-7",
+            model=_MODEL,
             max_tokens=max_tokens,
             thinking={"type": "adaptive"},
             system=[
@@ -99,7 +103,21 @@ def _call_claude(system_text: str, user_prompt: str, max_tokens: int) -> str:
         ) as stream:
             message = stream.get_final_message()
     except anthropic.APIError as exc:
+        logger.error(
+            "writer_agent[%s]: API error after %.1fs: %s", label, time.monotonic() - t0, exc
+        )
         raise RuntimeError(f"Claude API error: {exc}") from exc
+
+    elapsed = time.monotonic() - t0
+    usage = message.usage
+    logger.info(
+        "writer_agent[%s]: completed in %.1fs — input_tokens=%d output_tokens=%d cache_read=%d",
+        label,
+        elapsed,
+        usage.input_tokens,
+        usage.output_tokens,
+        getattr(usage, "cache_read_input_tokens", 0),
+    )
 
     text_blocks = [block.text for block in message.content if block.type == "text"]
     return "\n".join(text_blocks).strip()
@@ -112,16 +130,12 @@ def write_application(
     company_research: Optional[dict] = None,
     user_preferences: Optional[dict] = None,
 ) -> dict:
-    """Rewrite a CV and draft a cover letter tailored to a specific role.
-
-    Returns a dict with keys: tailored_cv, cover_letter.
-    """
+    """Rewrite a CV and draft a cover letter tailored to a specific role."""
     fit_summary = _format_fit_summary(fit_analysis)
     company_context = _format_company_context(company_research)
     cv_system = _build_system(_CV_SYSTEM_BASE, user_preferences)
     cover_system = _build_system(_COVER_LETTER_SYSTEM_BASE, user_preferences)
 
-    # --- Call 1: tailored CV ---
     cv_prompt = f"""\
 Rewrite the CV below to better match the job description.
 
@@ -140,9 +154,8 @@ RULES:
 --- JOB DESCRIPTION ---
 {job_description}
 """
-    tailored_cv = _call_claude(cv_system, cv_prompt, max_tokens=4096)
+    tailored_cv = _call_claude("cv", cv_system, cv_prompt, max_tokens=4096)
 
-    # --- Call 2: cover letter ---
     cover_prompt = f"""\
 Write a cover letter for the application below.
 
@@ -164,9 +177,6 @@ RULES:
 --- JOB DESCRIPTION ---
 {job_description}
 """
-    cover_letter = _call_claude(cover_system, cover_prompt, max_tokens=1024)
+    cover_letter = _call_claude("cover_letter", cover_system, cover_prompt, max_tokens=1024)
 
-    return {
-        "tailored_cv": tailored_cv,
-        "cover_letter": cover_letter,
-    }
+    return {"tailored_cv": tailored_cv, "cover_letter": cover_letter}
