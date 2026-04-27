@@ -35,7 +35,7 @@ def upgrade() -> None:
         "draft", "applied", "interviewing", "rejected", "offer",
         name="applicationstatus",
     )
-    applicationstatus.create(op.get_bind())
+    applicationstatus.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "applications",
@@ -59,7 +59,7 @@ def upgrade() -> None:
             "status",
             sa.Enum(
                 "draft", "applied", "interviewing", "rejected", "offer",
-                name="applicationstatus",
+                name="applicationstatus", create_type=False,
             ),
             nullable=False,
         ),
