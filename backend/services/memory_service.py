@@ -2,27 +2,25 @@ import json
 import os
 from typing import Any, Dict, Optional
 
-import redis
 from dotenv import load_dotenv
+from upstash_redis import Redis
 
 from database import SessionLocal
 from models.agent_memory import AgentMemory
 
 load_dotenv()
 
-_PREF_TTL = 30 * 24 * 60 * 60   # 30 days in seconds
-_SESSION_TTL = 60 * 60            # 1 hour in seconds
+_PREF_TTL = 30 * 24 * 60 * 60  # 30 days in seconds
+_SESSION_TTL = 60 * 60           # 1 hour in seconds
 
 
-def _redis() -> Optional[redis.Redis]:
-    url = os.getenv("REDIS_URL", "")
-    if not url:
+def _redis() -> Optional[Redis]:
+    """Return an Upstash Redis client when env vars are present, else None."""
+    if not os.getenv("UPSTASH_REDIS_REST_URL") or not os.getenv("UPSTASH_REDIS_REST_TOKEN"):
         return None
     try:
-        client = redis.from_url(url, decode_responses=True, socket_connect_timeout=2)
-        client.ping()
-        return client
-    except redis.RedisError:
+        return Redis.from_env()
+    except Exception:
         return None
 
 
@@ -50,7 +48,7 @@ def store_preference(user_id: int, key: str, value: Any) -> None:
             redis_key = _pref_key(user_id)
             r.hset(redis_key, key, json.dumps(value))
             r.expire(redis_key, _PREF_TTL)
-        except redis.RedisError:
+        except Exception:
             pass
 
     db = SessionLocal()
@@ -91,10 +89,9 @@ def get_preferences(user_id: int) -> Dict[str, Any]:
             raw = r.hgetall(_pref_key(user_id))
             if raw:
                 return {k: json.loads(v) for k, v in raw.items()}
-        except redis.RedisError:
+        except Exception:
             pass
 
-    # PostgreSQL fallback
     db = SessionLocal()
     try:
         row = (
@@ -113,7 +110,7 @@ def get_preferences(user_id: int) -> Dict[str, Any]:
                     redis_key = _pref_key(user_id)
                     r.hset(redis_key, mapping={k: json.dumps(v) for k, v in prefs.items()})
                     r.expire(redis_key, _PREF_TTL)
-                except redis.RedisError:
+                except Exception:
                     pass
             return prefs
         return {}
@@ -135,7 +132,7 @@ def store_session(user_id: int, session_data: Dict[str, Any]) -> None:
         return
     try:
         r.set(_session_key(user_id), json.dumps(session_data), ex=_SESSION_TTL)
-    except redis.RedisError:
+    except Exception:
         pass
 
 
@@ -150,5 +147,5 @@ def get_session(user_id: int) -> Dict[str, Any]:
     try:
         raw = r.get(_session_key(user_id))
         return json.loads(raw) if raw else {}
-    except (redis.RedisError, json.JSONDecodeError):
+    except (Exception, json.JSONDecodeError):
         return {}
