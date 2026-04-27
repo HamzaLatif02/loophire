@@ -31,11 +31,16 @@ def upgrade() -> None:
     op.create_index("ix_users_id", "users", ["id"], unique=False)
     op.create_index("ix_users_email", "users", ["email"], unique=True)
 
-    applicationstatus = sa.Enum(
-        "draft", "applied", "interviewing", "rejected", "offer",
-        name="applicationstatus",
-    )
-    applicationstatus.create(op.get_bind(), checkfirst=True)
+    # Create enum type idempotently — catches duplicate_object if DB already has it
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE applicationstatus AS ENUM (
+                'draft', 'applied', 'interviewing', 'rejected', 'offer'
+            );
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
     op.create_table(
         "applications",
@@ -98,7 +103,7 @@ def downgrade() -> None:
     op.drop_index("ix_applications_id", table_name="applications")
     op.drop_table("applications")
 
-    sa.Enum(name="applicationstatus").drop(op.get_bind())
+    sa.Enum(name="applicationstatus").drop(op.get_bind(), checkfirst=True)
 
     op.drop_index("ix_users_email", table_name="users")
     op.drop_index("ix_users_id", table_name="users")
