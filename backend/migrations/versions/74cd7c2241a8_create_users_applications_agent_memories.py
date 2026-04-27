@@ -6,6 +6,7 @@ Create Date: 2026-04-26 00:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ENUM
 
 revision = "74cd7c2241a8"
 down_revision = None
@@ -31,16 +32,11 @@ def upgrade() -> None:
     op.create_index("ix_users_id", "users", ["id"], unique=False)
     op.create_index("ix_users_email", "users", ["email"], unique=True)
 
-    # Create enum type idempotently — catches duplicate_object if DB already has it
-    op.execute("""
-        DO $$ BEGIN
-            CREATE TYPE applicationstatus AS ENUM (
-                'draft', 'applied', 'interviewing', 'rejected', 'offer'
-            );
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-    """)
+    applicationstatus = ENUM(
+        "draft", "applied", "interviewing", "rejected", "offer",
+        name="applicationstatus",
+    )
+    applicationstatus.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "applications",
@@ -62,7 +58,7 @@ def upgrade() -> None:
         sa.Column("company_research", sa.JSON(), nullable=True),
         sa.Column(
             "status",
-            sa.Enum(
+            ENUM(
                 "draft", "applied", "interviewing", "rejected", "offer",
                 name="applicationstatus", create_type=False,
             ),
@@ -103,7 +99,7 @@ def downgrade() -> None:
     op.drop_index("ix_applications_id", table_name="applications")
     op.drop_table("applications")
 
-    sa.Enum(name="applicationstatus").drop(op.get_bind(), checkfirst=True)
+    ENUM(name="applicationstatus").drop(op.get_bind(), checkfirst=True)
 
     op.drop_index("ix_users_email", table_name="users")
     op.drop_index("ix_users_id", table_name="users")
