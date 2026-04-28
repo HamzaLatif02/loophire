@@ -16,7 +16,14 @@ logger = logging.getLogger("loophire.services.research")
 _MODEL = "claude-opus-4-7"
 _TAVILY_URL = "https://api.tavily.com/search"
 _TAVILY_KEY = os.getenv("TAVILY_API_KEY", "")
-_anthropic = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+_anthropic_client: Optional[anthropic.Anthropic] = None
+
+
+def _get_anthropic() -> anthropic.Anthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env at call time
+    return _anthropic_client
 
 _SYSTEM_PROMPT = (
     "You are a business analyst synthesising web search results about a company. "
@@ -134,7 +141,7 @@ def research_company(company_name: str) -> Optional[dict]:
     t0 = time.monotonic()
 
     try:
-        with _anthropic.messages.stream(
+        with _get_anthropic().messages.stream(
             model=_MODEL,
             max_tokens=1024,
             thinking={"type": "adaptive"},

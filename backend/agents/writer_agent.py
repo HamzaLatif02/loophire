@@ -11,7 +11,14 @@ load_dotenv()
 logger = logging.getLogger("loophire.agents.writer")
 
 _MODEL = "claude-opus-4-7"
-_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+_client: Optional[anthropic.Anthropic] = None
+
+
+def _get_client() -> anthropic.Anthropic:
+    global _client
+    if _client is None:
+        _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env at call time
+    return _client
 
 _CV_SYSTEM_BASE = (
     "You are an expert CV writer and career coach. "
@@ -88,7 +95,7 @@ def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int
     t0 = time.monotonic()
 
     try:
-        with _client.messages.stream(
+        with _get_client().messages.stream(
             model=_MODEL,
             max_tokens=max_tokens,
             thinking={"type": "adaptive"},

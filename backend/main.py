@@ -19,6 +19,14 @@ logging.basicConfig(
 
 app = FastAPI(title="Loophire API")
 
+
+# ── root health (registered first so it is always reachable) ─────────────────
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost"],
@@ -34,23 +42,33 @@ app.include_router(applications_router.router)
 # ── startup ───────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
-def seed_guest_user() -> None:
-    """Create a default guest user (id=1) on first boot.
+def startup_check() -> None:
+    _log = logging.getLogger("loophire.main")
 
-    Auth is not yet implemented; all frontend calls use user_id=1. This
-    ensures that row exists so CV upload and application generation work
-    out of the box on a fresh database.
-    """
-    logger = logging.getLogger("loophire.main")
+    # Log which required env vars are present (values never printed)
+    required = ["DATABASE_URL", "ANTHROPIC_API_KEY", "TAVILY_API_KEY"]
+    optional = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"]
+    import os
+    for var in required:
+        if os.getenv(var):
+            _log.info("env %s: SET", var)
+        else:
+            _log.error("env %s: MISSING — this will cause failures", var)
+    for var in optional:
+        _log.info("env %s: %s", var, "SET" if os.getenv(var) else "not set (Redis disabled)")
+
+    # Seed a guest user (id=1) on first boot — auth not yet implemented
     db = SessionLocal()
     try:
         if not db.query(User).first():
             db.add(User(email="guest@loophire.app"))
             db.commit()
-            logger.info("Seeded default guest user (id=1)")
+            _log.info("Seeded default guest user (id=1)")
+        else:
+            _log.info("Guest user already exists — skipping seed")
     except Exception:
         db.rollback()
-        logger.exception("Failed to seed guest user")
+        _log.exception("Failed to seed guest user")
     finally:
         db.close()
 

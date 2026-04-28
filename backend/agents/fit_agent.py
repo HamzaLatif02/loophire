@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import time
+from typing import Optional
 
 import anthropic
 from dotenv import load_dotenv
@@ -12,7 +13,14 @@ load_dotenv()
 logger = logging.getLogger("loophire.agents.fit")
 
 _MODEL = "claude-sonnet-4-20250514"
-_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+_client: Optional[anthropic.Anthropic] = None
+
+
+def _get_client() -> anthropic.Anthropic:
+    global _client
+    if _client is None:
+        _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env at call time
+    return _client
 
 _SYSTEM_PROMPT = (
     "You are an expert technical recruiter and career coach. "
@@ -55,7 +63,7 @@ def analyse_fit(cv_text: str, job_description: str) -> dict:
     t0 = time.monotonic()
 
     try:
-        response = _client.messages.create(
+        response = _get_client().messages.create(
             model=_MODEL,
             max_tokens=1024,
             system=[
