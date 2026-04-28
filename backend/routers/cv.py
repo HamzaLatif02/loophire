@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
@@ -5,6 +7,8 @@ from database import get_db
 from models.user import User
 from schemas.cv import CVUploadResponse, CVResponse
 from services.cv_parser import parse_pdf
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["cv"])
 
@@ -14,6 +18,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 def _get_or_create_user(user_id: int, db: Session) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
+        logger.info("User %d not found — creating guest row", user_id)
         user = User(email="guest@loophire.app")
         db.add(user)
         db.commit()
@@ -27,10 +32,16 @@ async def upload_cv(
     user_id: int = Query(..., description="ID of the user uploading the CV"),
     db: Session = Depends(get_db),
 ):
+    logger.info("Upload endpoint hit")
+
     if file.content_type not in ("application/pdf", "application/octet-stream"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
+    logger.info("File received: %s, content_type: %s", file.filename, file.content_type)
+
     raw = await file.read()
+    logger.info("File read into memory: %d bytes", len(raw))
+
     if len(raw) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit.")
 
@@ -39,10 +50,14 @@ async def upload_cv(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
+    logger.info("PDF parsed, text length: %d chars", len(cv_text))
+
     user = _get_or_create_user(user_id, db)
     user.base_cv_text = cv_text
     db.commit()
     db.refresh(user)
+
+    logger.info("Saved to database successfully (user_id=%d)", user.id)
 
     return CVUploadResponse(
         user_id=user.id,
