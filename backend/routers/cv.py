@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -11,10 +11,13 @@ router = APIRouter(tags=["cv"])
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
-def _get_user(user_id: int, db: Session) -> User:
+def _get_or_create_user(user_id: int, db: Session) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = User(email="guest@loophire.app")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
     return user
 
 
@@ -36,7 +39,7 @@ async def upload_cv(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    user = _get_user(user_id, db)
+    user = _get_or_create_user(user_id, db)
     user.base_cv_text = cv_text
     db.commit()
     db.refresh(user)
@@ -53,5 +56,5 @@ def get_cv(
     user_id: int = Query(..., description="ID of the user"),
     db: Session = Depends(get_db),
 ):
-    user = _get_user(user_id, db)
+    user = _get_or_create_user(user_id, db)
     return CVResponse(user_id=user.id, cv_text=user.base_cv_text)

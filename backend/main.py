@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from database import SessionLocal
+from models.user import User
 from routers import applications as applications_router
 from routers import cv as cv_router
 
@@ -27,6 +29,30 @@ app.add_middleware(
 
 app.include_router(cv_router.router, prefix="/api/cv")
 app.include_router(applications_router.router)
+
+
+# ── startup ───────────────────────────────────────────────────────────────────
+
+@app.on_event("startup")
+def seed_guest_user() -> None:
+    """Create a default guest user (id=1) on first boot.
+
+    Auth is not yet implemented; all frontend calls use user_id=1. This
+    ensures that row exists so CV upload and application generation work
+    out of the box on a fresh database.
+    """
+    logger = logging.getLogger("loophire.main")
+    db = SessionLocal()
+    try:
+        if not db.query(User).first():
+            db.add(User(email="guest@loophire.app"))
+            db.commit()
+            logger.info("Seeded default guest user (id=1)")
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to seed guest user")
+    finally:
+        db.close()
 
 
 # ── exception handlers ────────────────────────────────────────────────────────
