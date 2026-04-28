@@ -6,7 +6,7 @@ from models.user import User
 from schemas.cv import CVUploadResponse, CVResponse
 from services.cv_parser import parse_pdf
 
-router = APIRouter(prefix="/api/cv", tags=["cv"])
+router = APIRouter(tags=["cv"])
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 

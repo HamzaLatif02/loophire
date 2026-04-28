@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(cv_router.router)
+app.include_router(cv_router.router, prefix="/api/cv")
 app.include_router(applications_router.router)
 
 
