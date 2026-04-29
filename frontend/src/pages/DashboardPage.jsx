@@ -125,13 +125,13 @@ export default function DashboardPage() {
           <p className="text-4xl">📭</p>
           <p className="font-semibold text-[var(--color-text)]">No applications yet</p>
           <p className="text-sm text-[var(--color-muted)] max-w-xs mx-auto">
-            Generate your first tailored application and it will appear here.
+            Generate your first application to get started
           </p>
           <button
             onClick={() => navigate('/apply')}
             className="mt-2 px-5 py-2.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
           >
-            Start a New Application →
+            Start a New Application
           </button>
         </div>
       </div>

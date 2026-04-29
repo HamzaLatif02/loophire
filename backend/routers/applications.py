@@ -92,7 +92,8 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
 
 @router.get("", response_model=List[ApplicationSummary])
 def list_applications(user_id: int, db: Session = Depends(get_db)):
-    _get_user(user_id, db)
+    # No user existence check — returns [] naturally when no records exist,
+    # so the frontend receives an empty array instead of a 404.
     return (
         db.query(Application)
         .filter(Application.user_id == user_id)
