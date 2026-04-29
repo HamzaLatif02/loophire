@@ -19,21 +19,26 @@ logging.basicConfig(
 
 app = FastAPI(title="Loophire API")
 
-
-# ── root health (registered first so it is always reachable) ─────────────────
-
-@app.get("/")
-def root():
-    return {"status": "ok"}
-
+# ── CORS (must be registered before any routes) ───────────────────────────────
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost"],
+    allow_origins=[
+        "https://loophire.xyz",
+        "https://www.loophire.xyz",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── routes ────────────────────────────────────────────────────────────────────
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
 app.include_router(cv_router.router, prefix="/api/cv")
 app.include_router(applications_router.router)
