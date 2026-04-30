@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import List
 
@@ -8,11 +9,14 @@ from sqlalchemy.orm import Session
 from agents.fit_agent import analyse_fit
 from agents.writer_agent import write_application
 from database import get_db
+from services.latex_export_service import generate_cv_pdf
 from services.memory_service import get_preferences
 from services.pdf_export_service import generate_pdf
 from services.research_service import research_company
 from models.application import Application, ApplicationStatus
 from models.user import User
+
+logger = logging.getLogger(__name__)
 from schemas.application import (
     ApplicationDetail,
     ApplicationGenerateRequest,
@@ -70,6 +74,7 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
             fit_analysis=fit_analysis,
             company_research=company_research,
             user_preferences=user_preferences or None,
+            cv_links=user.cv_links or [],
         )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"Document generation failed: {exc}")
@@ -83,6 +88,7 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
         keyword_gaps=fit_analysis.get("keyword_gaps"),
         company_research=company_research,
         tailored_cv=written["tailored_cv"],
+        tailored_cv_json=written["tailored_cv_json"],
         cover_letter=written["cover_letter"],
         status=ApplicationStatus.draft,
     )
@@ -137,15 +143,18 @@ def export_cv(
     user_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
-    user = _get_user(user_id, db)
+    _get_user(user_id, db)
     app = _get_application(application_id, user_id, db)
-    if not app.tailored_cv:
+    if not app.tailored_cv_json:
         raise HTTPException(status_code=404, detail="No tailored CV available for this application.")
-    pdf = generate_pdf(
-        f"Tailored CV — {app.job_title} at {app.company_name}",
-        app.tailored_cv,
-        links=user.cv_links or [],
-    )
+    try:
+        pdf = generate_cv_pdf(app.tailored_cv_json)
+    except RuntimeError as exc:
+        logger.error("LaTeX PDF generation failed for application %d: %s", application_id, exc)
+        raise HTTPException(
+            status_code=500,
+            detail="PDF generation failed — please try again or contact support",
+        )
     filename = f"tailored_cv_{_safe_filename(app.company_name)}.pdf"
     return Response(
         content=pdf,

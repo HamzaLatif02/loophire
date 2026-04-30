@@ -29,6 +29,7 @@ class Application(Base):
 
     fit_score = Column(Float, nullable=True)
     tailored_cv = Column(Text, nullable=True)
+    tailored_cv_json = Column(JSON, nullable=True)
     cover_letter = Column(Text, nullable=True)
     keyword_gaps = Column(JSON, nullable=True)
     company_research = Column(JSON, nullable=True)

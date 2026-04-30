@@ -1,7 +1,8 @@
+import json
 import logging
-import os
+import re
 import time
-from typing import Optional
+from typing import List, Optional
 
 import anthropic
 from dotenv import load_dotenv
@@ -20,11 +21,17 @@ def _get_client() -> anthropic.Anthropic:
         _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env at call time
     return _client
 
+
 _CV_SYSTEM_BASE = (
     "You are an expert CV writer and career coach. "
     "You rewrite CVs to better match specific job descriptions without fabricating experience. "
-    "You preserve the original structure and format exactly, only adjusting wording, ordering of bullets, "
-    "and emphasis to highlight relevant skills. Return plain text only — no markdown, no commentary."
+    "You preserve the original structure exactly, only adjusting wording, ordering of bullets, "
+    "and emphasis to highlight relevant skills.\n\n"
+    "CRITICAL OUTPUT RULES:\n"
+    "- Return ONLY a valid JSON object. No markdown, no code fences, no commentary before or after.\n"
+    "- Preserve all github_url and live_url values exactly as provided — never invent or modify URLs.\n"
+    "- Only tailor the text content (profile, bullet points, skill items). Never change the structure.\n"
+    "- Every string value must be plain text — no LaTeX, no markdown."
 )
 
 _COVER_LETTER_SYSTEM_BASE = (
@@ -90,6 +97,17 @@ def _format_company_context(company_research: Optional[dict]) -> str:
     return "\n".join(lines)
 
 
+def _format_links_context(cv_links: Optional[List[dict]]) -> str:
+    if not cv_links:
+        return "No links extracted from CV."
+    lines = ["Links extracted from the CV (use these exact URLs for github_url and live_url):"]
+    for lk in cv_links:
+        anchor = lk.get("anchor_text", "(no anchor)")
+        url = lk.get("url", "")
+        lines.append(f'  - anchor: "{anchor}", url: "{url}"')
+    return "\n".join(lines)
+
+
 def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int) -> str:
     logger.info("writer_agent[%s]: calling %s (max_tokens=%d)", label, _MODEL, max_tokens)
     t0 = time.monotonic()
@@ -130,30 +148,122 @@ def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int
     return "\n".join(text_blocks).strip()
 
 
+def _parse_json_response(text: str) -> dict:
+    """Strip markdown code fences if present, then parse JSON."""
+    text = text.strip()
+    match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
+    if match:
+        text = match.group(1).strip()
+    return json.loads(text)
+
+
+def _json_to_plain_text(d: dict) -> str:
+    """Convert structured CV JSON to readable plain text for UI display."""
+    lines = []
+
+    if d.get("profile"):
+        lines += ["PROFILE", d["profile"], ""]
+
+    if d.get("technical_skills"):
+        lines.append("TECHNICAL SKILLS")
+        for s in d["technical_skills"]:
+            lines.append(f"  {s.get('category', '')}: {s.get('items', '')}")
+        lines.append("")
+
+    if d.get("education"):
+        lines.append("EDUCATION")
+        for edu in d["education"]:
+            lines.append(
+                f"  {edu.get('institution', '')} — {edu.get('degree', '')} ({edu.get('dates', '')})"
+            )
+            for b in edu.get("highlights", []):
+                lines.append(f"    • {b}")
+        lines.append("")
+
+    if d.get("experience"):
+        lines.append("EXPERIENCE")
+        for exp in d["experience"]:
+            lines.append(
+                f"  {exp.get('title', '')}, {exp.get('company', '')} ({exp.get('dates', '')})"
+            )
+            for b in exp.get("highlights", []):
+                lines.append(f"    • {b}")
+        lines.append("")
+
+    if d.get("projects"):
+        lines.append("PROJECTS")
+        for proj in d["projects"]:
+            lines.append(f"  {proj.get('name', '')}")
+            if proj.get("github_url"):
+                lines.append(f"    GitHub: {proj['github_url']}")
+            for b in proj.get("highlights", []):
+                lines.append(f"    • {b}")
+        lines.append("")
+
+    return "\n".join(lines).strip()
+
+
 def write_application(
     cv_text: str,
     job_description: str,
     fit_analysis: dict,
     company_research: Optional[dict] = None,
     user_preferences: Optional[dict] = None,
+    cv_links: Optional[List[dict]] = None,
 ) -> dict:
-    """Rewrite a CV and draft a cover letter tailored to a specific role."""
+    """Rewrite a CV as structured JSON and draft a plain-text cover letter."""
     fit_summary = _format_fit_summary(fit_analysis)
     company_context = _format_company_context(company_research)
+    links_context = _format_links_context(cv_links)
     cv_system = _build_system(_CV_SYSTEM_BASE, user_preferences)
     cover_system = _build_system(_COVER_LETTER_SYSTEM_BASE, user_preferences)
 
     cv_prompt = f"""\
-Rewrite the CV below to better match the job description.
+Rewrite the CV below to better match the job description and return it as a JSON object.
 
 RULES:
-- Keep the exact same sections and structure as the original CV.
 - Reorder or reword bullet points to bring relevant experience to the top.
-- Naturally incorporate missing keywords where the experience genuinely supports it — never fabricate.
+- Naturally incorporate missing keywords where experience genuinely supports it — never fabricate.
 - Do not add new sections or remove existing ones.
-- Return the full rewritten CV as plain text.
+- Preserve all github_url and live_url values exactly from the links list — never invent or modify URLs.
+- Every string must be plain text only (no LaTeX, no markdown).
+- Return ONLY the JSON object — no markdown fences, no commentary.
+
+JSON SCHEMA (return exactly this structure):
+{{
+  "profile": "tailored profile paragraph as a single string",
+  "technical_skills": [
+    {{"category": "category name", "items": "comma-separated items"}}
+  ],
+  "education": [
+    {{
+      "institution": "university name",
+      "degree": "degree title",
+      "dates": "date range e.g. Sept 2021 - June 2025",
+      "highlights": ["bullet point 1", "bullet point 2"]
+    }}
+  ],
+  "experience": [
+    {{
+      "title": "job title",
+      "company": "company name",
+      "dates": "date range",
+      "highlights": ["bullet point 1", "bullet point 2"]
+    }}
+  ],
+  "projects": [
+    {{
+      "name": "project name",
+      "github_url": "exact github URL from links list, or empty string",
+      "live_url": "exact live URL from links list, or empty string",
+      "highlights": ["bullet point 1", "bullet point 2"]
+    }}
+  ]
+}}
 
 {fit_summary}
+
+{links_context}
 
 --- ORIGINAL CV ---
 {cv_text}
@@ -161,7 +271,20 @@ RULES:
 --- JOB DESCRIPTION ---
 {job_description}
 """
-    tailored_cv = _call_claude("cv", cv_system, cv_prompt, max_tokens=4096)
+
+    cv_raw = _call_claude("cv", cv_system, cv_prompt, max_tokens=4096)
+
+    try:
+        tailored_cv_json = _parse_json_response(cv_raw)
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.error(
+            "writer_agent[cv]: failed to parse JSON response: %s\nRaw (first 500 chars): %s",
+            exc,
+            cv_raw[:500],
+        )
+        raise RuntimeError(f"CV structured output parse failed: {exc}") from exc
+
+    tailored_cv_text = _json_to_plain_text(tailored_cv_json)
 
     cover_prompt = f"""\
 Write a cover letter for the application below.
@@ -186,4 +309,8 @@ RULES:
 """
     cover_letter = _call_claude("cover_letter", cover_system, cover_prompt, max_tokens=1024)
 
-    return {"tailored_cv": tailored_cv, "cover_letter": cover_letter}
+    return {
+        "tailored_cv": tailored_cv_text,
+        "tailored_cv_json": tailored_cv_json,
+        "cover_letter": cover_letter,
+    }

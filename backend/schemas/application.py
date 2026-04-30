@@ -33,6 +33,7 @@ class ApplicationDetail(BaseModel):
     job_description: Optional[str]
     fit_score: Optional[float]
     tailored_cv: Optional[str]
+    tailored_cv_json: Optional[Dict[str, Any]] = None
     cover_letter: Optional[str]
     keyword_gaps: Optional[List[Any]]
     company_research: Optional[Dict[str, Any]]
