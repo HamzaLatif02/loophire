@@ -113,10 +113,9 @@ def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int
     t0 = time.monotonic()
 
     try:
-        with _get_client().messages.stream(
+        message = _get_client().messages.create(
             model=_MODEL,
             max_tokens=max_tokens,
-            thinking={"type": "adaptive"},
             system=[
                 {
                     "type": "text",
@@ -125,8 +124,7 @@ def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int
                 }
             ],
             messages=[{"role": "user", "content": user_prompt}],
-        ) as stream:
-            message = stream.get_final_message()
+        )
     except anthropic.APIError as exc:
         logger.error(
             "writer_agent[%s]: API error after %.1fs: %s", label, time.monotonic() - t0, exc
@@ -144,8 +142,10 @@ def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int
         getattr(usage, "cache_read_input_tokens", 0),
     )
 
-    text_blocks = [block.text for block in message.content if block.type == "text"]
-    return "\n".join(text_blocks).strip()
+    result = message.content[0].text.strip()
+    if not result:
+        raise RuntimeError(f"Claude returned an empty response for '{label}'")
+    return result
 
 
 def _parse_json_response(text: str) -> dict:
