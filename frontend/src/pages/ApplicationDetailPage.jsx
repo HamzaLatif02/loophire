@@ -213,10 +213,20 @@ export default function ApplicationDetailPage() {
         </div>
 
         {activeTab === 0 && (
-          <TextPanel content={app.tailored_cv} emptyMsg="No tailored CV was generated for this application." />
+          <TextPanel
+            content={app.tailored_cv}
+            emptyMsg="No tailored CV was generated for this application."
+            exportUrl={`/api/applications/${id}/export/cv?user_id=${USER_ID}`}
+            exportFilename={`tailored_cv_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
+          />
         )}
         {activeTab === 1 && (
-          <TextPanel content={app.cover_letter} emptyMsg="No cover letter was generated for this application." />
+          <TextPanel
+            content={app.cover_letter}
+            emptyMsg="No cover letter was generated for this application."
+            exportUrl={`/api/applications/${id}/export/cover-letter?user_id=${USER_ID}`}
+            exportFilename={`cover_letter_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
+          />
         )}
         {activeTab === 2 && (
           <AnalysisPanel app={app} score={score} color={color} fitLabel={fitLabel} />
@@ -262,7 +272,29 @@ function ScoreCircle({ score, color }) {
 
 // ─── text panel ───────────────────────────────────────────────────────────────
 
-function TextPanel({ content, emptyMsg }) {
+function TextPanel({ content, emptyMsg, exportUrl, exportFilename }) {
+  const [exporting, setExporting] = useState(false)
+
+  async function handleExport() {
+    if (!exportUrl || exporting) return
+    setExporting(true)
+    try {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      const res = await fetch(`${base}${exportUrl}`)
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = exportFilename
+      link.click()
+      URL.revokeObjectURL(link.href)
+    } catch {
+      // non-critical — browser will show nothing downloaded
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (!content) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-border)] p-12 text-center">
@@ -278,7 +310,25 @@ function TextPanel({ content, emptyMsg }) {
         <span className="text-xs text-[var(--color-muted)]">
           {content.length.toLocaleString()} characters · {content.split('\n').length} lines
         </span>
-        <CopyButton text={content} />
+        <div className="flex items-center gap-3">
+          <CopyButton text={content} />
+          {exportUrl && (
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {exporting ? (
+                <Spinner size={13} />
+              ) : (
+                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              )}
+              Export PDF
+            </button>
+          )}
+        </div>
       </div>
       {/* body */}
       <pre className="p-5 text-sm text-[var(--color-text)] font-mono leading-relaxed whitespace-pre-wrap break-words overflow-y-auto max-h-[65vh]">

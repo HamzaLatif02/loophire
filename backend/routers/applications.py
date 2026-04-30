@@ -1,12 +1,15 @@
+import re
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from agents.fit_agent import analyse_fit
 from agents.writer_agent import write_application
 from database import get_db
 from services.memory_service import get_preferences
+from services.pdf_export_service import generate_pdf
 from services.research_service import research_company
 from models.application import Application, ApplicationStatus
 from models.user import User
@@ -121,3 +124,46 @@ def update_status(
     db.commit()
     db.refresh(application)
     return application
+
+
+def _safe_filename(text: str) -> str:
+    """Strip non-alphanumeric characters so filenames are safe across OS."""
+    return re.sub(r"[^\w]+", "_", text).strip("_").lower()
+
+
+@router.get("/{application_id}/export/cv")
+def export_cv(
+    application_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    _get_user(user_id, db)
+    app = _get_application(application_id, user_id, db)
+    if not app.tailored_cv:
+        raise HTTPException(status_code=404, detail="No tailored CV available for this application.")
+    pdf = generate_pdf(f"Tailored CV — {app.job_title} at {app.company_name}", app.tailored_cv)
+    filename = f"tailored_cv_{_safe_filename(app.company_name)}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{application_id}/export/cover-letter")
+def export_cover_letter(
+    application_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    _get_user(user_id, db)
+    app = _get_application(application_id, user_id, db)
+    if not app.cover_letter:
+        raise HTTPException(status_code=404, detail="No cover letter available for this application.")
+    pdf = generate_pdf(f"Cover Letter — {app.job_title} at {app.company_name}", app.cover_letter)
+    filename = f"cover_letter_{_safe_filename(app.company_name)}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
