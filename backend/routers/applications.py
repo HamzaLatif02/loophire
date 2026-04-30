@@ -137,11 +137,15 @@ def export_cv(
     user_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
-    _get_user(user_id, db)
+    user = _get_user(user_id, db)
     app = _get_application(application_id, user_id, db)
     if not app.tailored_cv:
         raise HTTPException(status_code=404, detail="No tailored CV available for this application.")
-    pdf = generate_pdf(f"Tailored CV — {app.job_title} at {app.company_name}", app.tailored_cv)
+    pdf = generate_pdf(
+        f"Tailored CV — {app.job_title} at {app.company_name}",
+        app.tailored_cv,
+        links=user.cv_links or [],
+    )
     filename = f"tailored_cv_{_safe_filename(app.company_name)}.pdf"
     return Response(
         content=pdf,
@@ -160,7 +164,10 @@ def export_cover_letter(
     app = _get_application(application_id, user_id, db)
     if not app.cover_letter:
         raise HTTPException(status_code=404, detail="No cover letter available for this application.")
-    pdf = generate_pdf(f"Cover Letter — {app.job_title} at {app.company_name}", app.cover_letter)
+    pdf = generate_pdf(
+        f"Cover Letter — {app.job_title} at {app.company_name}",
+        app.cover_letter,
+    )
     filename = f"cover_letter_{_safe_filename(app.company_name)}.pdf"
     return Response(
         content=pdf,

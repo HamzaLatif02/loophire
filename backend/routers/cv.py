@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
 from schemas.cv import CVUploadResponse, CVResponse
-from services.cv_parser import parse_pdf
+from services.cv_parser import parse_pdf_with_links
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +46,17 @@ async def upload_cv(
         raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit.")
 
     try:
-        cv_text = parse_pdf(raw)
+        parsed = parse_pdf_with_links(raw)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    logger.info("PDF parsed, text length: %d chars", len(cv_text))
+    cv_text = parsed["text"]
+    cv_links = parsed["links"]
+    logger.info("PDF parsed: %d chars, %d links", len(cv_text), len(cv_links))
 
     user = _get_or_create_user(user_id, db)
     user.base_cv_text = cv_text
+    user.cv_links = cv_links
     db.commit()
     db.refresh(user)
 
@@ -63,6 +66,7 @@ async def upload_cv(
         user_id=user.id,
         cv_text=cv_text,
         characters=len(cv_text),
+        links=cv_links,
     )
 
 
