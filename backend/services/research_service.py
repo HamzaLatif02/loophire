@@ -13,7 +13,7 @@ load_dotenv()
 
 logger = logging.getLogger("loophire.services.research")
 
-_MODEL = "claude-opus-4-7"
+_MODEL = "claude-haiku-4-5-20251001"
 _TAVILY_URL = "https://api.tavily.com/search"
 _TAVILY_KEY = os.getenv("TAVILY_API_KEY", "")
 _anthropic_client: Optional[anthropic.Anthropic] = None
@@ -141,10 +141,9 @@ def research_company(company_name: str) -> Optional[dict]:
     t0 = time.monotonic()
 
     try:
-        with _get_anthropic().messages.stream(
+        message = _get_anthropic().messages.create(
             model=_MODEL,
             max_tokens=1024,
-            thinking={"type": "adaptive"},
             system=[
                 {
                     "type": "text",
@@ -153,8 +152,7 @@ def research_company(company_name: str) -> Optional[dict]:
                 }
             ],
             messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            message = stream.get_final_message()
+        )
     except anthropic.APIError as exc:
         logger.error("research: API error after %.1fs: %s", time.monotonic() - t0, exc)
         raise RuntimeError(f"Claude API error during research synthesis: {exc}") from exc
@@ -169,8 +167,7 @@ def research_company(company_name: str) -> Optional[dict]:
         getattr(usage, "cache_read_input_tokens", 0),
     )
 
-    text_blocks = [block.text for block in message.content if block.type == "text"]
-    raw = "\n".join(text_blocks).strip()
+    raw = message.content[0].text.strip()
     cleaned = _strip_fences(raw)
 
     try:

@@ -11,7 +11,7 @@ load_dotenv()
 
 logger = logging.getLogger("loophire.agents.writer")
 
-_MODEL = "claude-opus-4-7"
+_MODEL = "claude-sonnet-4-6"
 _client: Optional[anthropic.Anthropic] = None
 
 
