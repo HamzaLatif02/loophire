@@ -5,7 +5,65 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+
+def _xml_escape(text: str) -> str:
+    """Escape characters that would break reportlab's XML Paragraph parser."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _apply_links(line: str, link_map: List[Dict]) -> str:
+    """Return an XML-safe line with anchor_text occurrences replaced by
+    inline reportlab hyperlink tags.
+
+    Strategy:
+    - Sort links by anchor_text length (longest first) to prevent a short
+      anchor from consuming part of a longer one.
+    - Find all non-overlapping occurrences in a single left-to-right pass.
+    - Escape plain text segments; leave link tags unescaped so reportlab
+      interprets them as markup.
+    """
+    candidates = [
+        lk for lk in link_map
+        if lk.get("anchor_text") and lk.get("url") and lk["anchor_text"] in line
+    ]
+
+    if not candidates:
+        return _xml_escape(line)
+
+    # Sort longest anchor first to avoid partial-match shadowing
+    candidates.sort(key=lambda x: len(x["anchor_text"]), reverse=True)
+
+    # Collect non-overlapping (start, end, tag) spans
+    spans: List = []
+    for lk in candidates:
+        anchor = lk["anchor_text"]
+        url = lk["url"]
+        idx = line.find(anchor)
+        if idx == -1:
+            continue
+        end = idx + len(anchor)
+        # Skip if this span overlaps any already-claimed region
+        if any(s < end and e > idx for s, e, _ in spans):
+            continue
+        safe_url = _xml_escape(url)
+        safe_anchor = _xml_escape(anchor)
+        tag = f'<a href="{safe_url}" color="blue"><u>{safe_anchor}</u></a>'
+        spans.append((idx, end, tag))
+
+    if not spans:
+        return _xml_escape(line)
+
+    spans.sort()  # left to right
+    parts: List[str] = []
+    prev = 0
+    for start, end, tag in spans:
+        parts.append(_xml_escape(line[prev:start]))
+        parts.append(tag)
+        prev = end
+    parts.append(_xml_escape(line[prev:]))
+    return "".join(parts)
 
 
 def generate_pdf(
@@ -13,17 +71,21 @@ def generate_pdf(
     content: str,
     links: Optional[List[Dict]] = None,
 ) -> bytes:
-    """Render a titled document with body text and an optional Links section.
+    """Render a titled document with hyperlinks embedded inline.
 
     Args:
         title:   Document heading.
         content: Plain-text body; blank lines become vertical spacers.
-        links:   List of {"url": str, "page": int} dicts from cv_parser.
-                 When provided, a "Links" section is appended after the body.
+        links:   List of {"anchor_text": str, "url": str} dicts.
+                 Wherever anchor_text appears in a content line it is
+                 replaced with a clickable blue underlined hyperlink.
+                 Links without anchor_text are silently ignored.
 
     Returns:
         Raw PDF bytes.
     """
+    link_map: List[Dict] = links or []
+
     buf = io.BytesIO()
 
     doc = SimpleDocTemplate(
@@ -45,15 +107,6 @@ def generate_pdf(
         spaceAfter=8 * mm,
     )
 
-    section_heading_style = ParagraphStyle(
-        "SectionHeading",
-        parent=base["Heading2"],
-        fontSize=12,
-        leading=16,
-        spaceBefore=6 * mm,
-        spaceAfter=3 * mm,
-    )
-
     body_style = ParagraphStyle(
         "Body",
         parent=base["Normal"],
@@ -62,42 +115,14 @@ def generate_pdf(
         spaceAfter=4,
     )
 
-    link_style = ParagraphStyle(
-        "Link",
-        parent=base["Normal"],
-        fontSize=9,
-        leading=14,
-        textColor=colors.HexColor("#4F7FFF"),
-        spaceAfter=3,
-    )
+    story = [Paragraph(_xml_escape(title), heading_style)]
 
-    # ── title ──────────────────────────────────────────────────────────────────
-    story = [Paragraph(title, heading_style)]
-
-    # ── body ───────────────────────────────────────────────────────────────────
     for line in content.splitlines():
         if line.strip() == "":
             story.append(Spacer(1, 4 * mm))
         else:
-            safe = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            safe = _apply_links(line, link_map)
             story.append(Paragraph(safe, body_style))
-
-    # ── links section ──────────────────────────────────────────────────────────
-    if links:
-        story.append(Spacer(1, 6 * mm))
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#CCCCCC")))
-        story.append(Paragraph("Links", section_heading_style))
-
-        for item in links:
-            url = item.get("url", "")
-            page = item.get("page")
-            if not url:
-                continue
-            safe_url = url.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            label = f'<a href="{safe_url}" color="#4F7FFF"><u>{safe_url}</u></a>'
-            if page is not None:
-                label += f'<font color="#888888" size="8">  (p.{page})</font>'
-            story.append(Paragraph(label, link_style))
 
     doc.build(story)
     return buf.getvalue()

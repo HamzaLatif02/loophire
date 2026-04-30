@@ -39,19 +39,15 @@ def _clean_whitespace(text: str) -> str:
 
 
 def _extract_uri(annot: dict) -> Optional[str]:
-    """Pull a URI string out of a pdfplumber annotation dict.
+    """Return the URI from a pdfplumber annotation dict, or None.
 
-    pdfplumber versions differ in how they surface link targets:
-    - Some expose a flat 'uri' key directly on the annotation dict.
-    - Others nest it under annot['data']['A']['URI'] per the PDF spec.
-    Both byte strings and plain strings are handled.
+    Handles both pdfplumber's flat 'uri' key and the nested
+    data.A.URI structure from the raw PDF spec.
     """
-    # Flat key (pdfplumber >= 0.10 normalised form)
     uri = annot.get("uri")
     if uri:
         return uri.decode("utf-8", errors="replace") if isinstance(uri, bytes) else str(uri)
 
-    # Nested PDF structure: /Action dict → /URI
     data = annot.get("data") or {}
     action = data.get("A") if isinstance(data, dict) else None
     if isinstance(action, dict):
@@ -62,19 +58,43 @@ def _extract_uri(annot: dict) -> Optional[str]:
     return None
 
 
+def _extract_bbox(annot: dict):
+    """Return (x0, y0, x1, y1) from an annotation, or None if unavailable."""
+    x0 = annot.get("x0")
+    y0 = annot.get("y0")
+    x1 = annot.get("x1")
+    y1 = annot.get("y1")
+    if all(v is not None for v in (x0, y0, x1, y1)):
+        return (x0, y0, x1, y1)
+
+    # Fallback: raw PDF Rect array [llx, lly, urx, ury] in PDF space.
+    # pdfplumber exposes this under data.Rect; it converts to screen coords
+    # automatically when you pass a bbox to page.crop().
+    rect = (annot.get("data") or {}).get("Rect")
+    if rect and len(rect) == 4:
+        return tuple(rect)
+
+    return None
+
+
 def parse_pdf(file_bytes: bytes) -> str:
     """Extract and clean text from a PDF given its raw bytes (text only)."""
     return parse_pdf_with_links(file_bytes)["text"]
 
 
 def parse_pdf_with_links(file_bytes: bytes) -> Dict:
-    """Extract cleaned text and hyperlinks from a PDF.
+    """Extract cleaned text and hyperlinks (with anchor text) from a PDF.
+
+    Each link dict has:
+        anchor_text: str  — the visible text the hyperlink was applied to
+        url:         str  — the target URI
+
+    Links without a bounding box, or where the crop yields no text, are
+    still recorded but without an anchor_text key, so the PDF renderer can
+    fall back gracefully.
 
     Returns:
-        {
-            "text":  str  — cleaned body text,
-            "links": list — [{"url": str, "page": int}, ...] deduplicated
-        }
+        {"text": str, "links": [{"anchor_text": str, "url": str}, ...]}
     """
     pages_text: List[str] = []
     seen_urls: set = set()
@@ -86,16 +106,31 @@ def parse_pdf_with_links(file_bytes: bytes) -> Dict:
             if page_text:
                 pages_text.append(page_text)
 
-            # Extract hyperlinks from page annotations
-            annots = page.annots or []
-            for annot in annots:
+            for annot in (page.annots or []):
                 try:
-                    uri = _extract_uri(annot if isinstance(annot, dict) else vars(annot))
+                    a = annot if isinstance(annot, dict) else vars(annot)
+                    uri = _extract_uri(a)
+                    if not uri or uri in seen_urls:
+                        continue
+
+                    anchor_text: Optional[str] = None
+                    bbox = _extract_bbox(a)
+                    if bbox:
+                        try:
+                            cropped = page.crop(bbox)
+                            raw_anchor = cropped.extract_text()
+                            if raw_anchor and raw_anchor.strip():
+                                anchor_text = raw_anchor.strip()
+                        except Exception:
+                            pass
+
+                    seen_urls.add(uri)
+                    entry: Dict = {"url": uri}
+                    if anchor_text:
+                        entry["anchor_text"] = anchor_text
+                    links.append(entry)
                 except Exception:
                     continue
-                if uri and uri not in seen_urls:
-                    seen_urls.add(uri)
-                    links.append({"url": uri, "page": page.page_number})
 
     if not pages_text:
         raise ValueError("No extractable text found in the PDF.")
