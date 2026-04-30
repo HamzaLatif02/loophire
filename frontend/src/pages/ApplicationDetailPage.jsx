@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import CopyButton from '../components/CopyButton'
 import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
 import api from '../utils/api'
@@ -262,18 +263,6 @@ function ScoreCircle({ score, color }) {
 // ─── text panel ───────────────────────────────────────────────────────────────
 
 function TextPanel({ content, emptyMsg }) {
-  const [copied, setCopied] = useState(false)
-  const timerRef = useRef(null)
-
-  function copy() {
-    if (!content) return
-    navigator.clipboard.writeText(content).then(() => {
-      setCopied(true)
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setCopied(false), 2000)
-    })
-  }
-
   if (!content) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-border)] p-12 text-center">
@@ -289,31 +278,7 @@ function TextPanel({ content, emptyMsg }) {
         <span className="text-xs text-[var(--color-muted)]">
           {content.length.toLocaleString()} characters · {content.split('\n').length} lines
         </span>
-        <button
-          onClick={copy}
-          className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-            copied
-              ? 'text-[var(--color-success)]'
-              : 'text-[var(--color-muted)] hover:text-[var(--color-accent)]'
-          }`}
-        >
-          {copied ? (
-            <>
-              <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Copied!
-            </>
-          ) : (
-            <>
-              <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-              </svg>
-              Copy
-            </>
-          )}
-        </button>
+        <CopyButton text={content} />
       </div>
       {/* body */}
       <pre className="p-5 text-sm text-[var(--color-text)] font-mono leading-relaxed whitespace-pre-wrap break-words overflow-y-auto max-h-[65vh]">
