@@ -59,21 +59,19 @@ def _extract_uri(annot: dict) -> Optional[str]:
 
 
 def _extract_bbox(annot: dict):
-    """Return (x0, y0, x1, y1) from an annotation, or None if unavailable."""
+    """Return a bbox tuple in pdfplumber coordinates for page.crop().
+
+    pdfplumber's crop() expects (x0, top, x1, bottom) where top/bottom
+    are measured from the top of the page — NOT the PDF-native y0/y1
+    which are measured from the bottom.  Using y0/y1 crops the wrong
+    region entirely and returns garbage text.
+    """
     x0 = annot.get("x0")
-    y0 = annot.get("y0")
     x1 = annot.get("x1")
-    y1 = annot.get("y1")
-    if all(v is not None for v in (x0, y0, x1, y1)):
-        return (x0, y0, x1, y1)
-
-    # Fallback: raw PDF Rect array [llx, lly, urx, ury] in PDF space.
-    # pdfplumber exposes this under data.Rect; it converts to screen coords
-    # automatically when you pass a bbox to page.crop().
-    rect = (annot.get("data") or {}).get("Rect")
-    if rect and len(rect) == 4:
-        return tuple(rect)
-
+    top = annot.get("top")       # pdfplumber coord: distance from top
+    bottom = annot.get("bottom") # pdfplumber coord: distance from top
+    if all(v is not None for v in (x0, top, x1, bottom)):
+        return (x0, top, x1, bottom)
     return None
 
 
@@ -127,7 +125,7 @@ def parse_pdf_with_links(file_bytes: bytes) -> Dict:
                     seen_urls.add(uri)
                     entry: Dict = {"url": uri}
                     if anchor_text:
-                        entry["anchor_text"] = anchor_text
+                        entry["anchor_text"] = _fix_encoding(anchor_text)
                     links.append(entry)
                 except Exception:
                     continue

@@ -77,3 +77,15 @@ def get_cv(
 ):
     user = _get_or_create_user(user_id, db)
     return CVResponse(user_id=user.id, cv_text=user.base_cv_text)
+
+
+@router.get("/debug-links")
+def debug_links(
+    user_id: int = Query(..., description="ID of the user"),
+    db: Session = Depends(get_db),
+):
+    """Return the raw cv_links stored for the user — for debugging link extraction only."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"user_id": user.id, "cv_links": user.cv_links or []}
