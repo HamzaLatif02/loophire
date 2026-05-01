@@ -168,13 +168,13 @@ def build_latex(d: dict) -> str:
 \usepackage{paracol}
 \usepackage{ifthen}
 \usepackage{needspace}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
 \usepackage{iftex}
 \ifPDFTeX
     \input{glyphtounicode}
     \pdfgentounicode=1
-    \usepackage[T1]{fontenc}
-    \usepackage[utf8]{inputenc}
-    \usepackage{lmodern}
+    \IfFileExists{lmodern.sty}{\usepackage{lmodern}}{}
 \fi
 \usepackage{charter}
 \raggedright

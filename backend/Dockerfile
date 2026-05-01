@@ -3,13 +3,14 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # System deps for psycopg2-binary, pdfplumber, and LaTeX PDF generation
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     libpq-dev \
     texlive-latex-base \
     texlive-latex-extra \
     texlive-fonts-recommended \
     texlive-fonts-extra \
     texlive-xetex \
+    lmodern \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
