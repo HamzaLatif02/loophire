@@ -201,29 +201,31 @@ def build_latex(d: dict) -> str:
     \sbox\ANDbox{$|$}
 
     \begin{header}
-        \fontsize{25pt}{25pt}\selectfont Hamza Latif
-        \vspace{5pt}
+        \fontsize{25 pt}{25 pt}\selectfont Hamza Latif
+
+        \vspace{5 pt}
+
         \normalsize
         \mbox{\hrefWithoutArrow{mailto:lhamza1020@gmail.com}{lhamza1020@gmail.com}}%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \AND%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \mbox{\hrefWithoutArrow{tel:+44 7907411957}{07907411957}}%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \AND%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \mbox{\hrefWithoutArrow{https://www.linkedin.com/in/latif-hamza/}{\textcolor{blue}{\underline{LinkedIn}}}}%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \AND%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \mbox{\hrefWithoutArrow{https://github.com/HamzaLatif02}{\textcolor{blue}{\underline{Github}}}}%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \AND%
-        \kern 5.0pt%
+        \kern 5.0 pt%
         \mbox{\hrefWithoutArrow{https://hamzalatif.xyz}{\textcolor{blue}{\underline{Website}}}}%
     \end{header}
 
-    \vspace{5pt - 0.3cm}
+    \vspace{5 pt - 0.3 cm}
 
     \section{Profile}
         \begin{onecolentry}
