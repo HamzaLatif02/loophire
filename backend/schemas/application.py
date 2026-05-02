@@ -47,3 +47,8 @@ class ApplicationDetail(BaseModel):
 
 class ApplicationStatusUpdate(BaseModel):
     status: ApplicationStatus
+
+
+class ApplicationPatchRequest(BaseModel):
+    tailored_cv_json: Optional[Dict[str, Any]] = None
+    cover_letter: Optional[str] = None

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 from schemas.application import (
     ApplicationDetail,
     ApplicationGenerateRequest,
+    ApplicationPatchRequest,
     ApplicationStatusUpdate,
     ApplicationSummary,
 )
@@ -115,6 +116,41 @@ def list_applications(user_id: int, db: Session = Depends(get_db)):
 def get_application(application_id: int, user_id: int, db: Session = Depends(get_db)):
     _get_user(user_id, db)
     return _get_application(application_id, user_id, db)
+
+
+def _flatten_cv_json(cv_json: dict) -> str:
+    lines = []
+    lines.append(cv_json.get("profile", ""))
+    for skill in cv_json.get("technical_skills", []):
+        lines.append(f"{skill['category']}: {skill['items']}")
+    for exp in cv_json.get("experience", []):
+        lines.append(f"{exp['title']} at {exp['company']} ({exp['dates']})")
+        for h in exp.get("highlights", []):
+            lines.append(f"  - {h}")
+    for proj in cv_json.get("projects", []):
+        lines.append(proj["name"])
+        for h in proj.get("highlights", []):
+            lines.append(f"  - {h}")
+    return "\n".join(lines)
+
+
+@router.patch("/{application_id}", response_model=ApplicationDetail)
+def patch_application(
+    application_id: int,
+    body: ApplicationPatchRequest,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    _get_user(user_id, db)
+    application = _get_application(application_id, user_id, db)
+    if body.tailored_cv_json is not None:
+        application.tailored_cv_json = body.tailored_cv_json
+        application.tailored_cv = _flatten_cv_json(body.tailored_cv_json)
+    if body.cover_letter is not None:
+        application.cover_letter = body.cover_letter
+    db.commit()
+    db.refresh(application)
+    return application
 
 
 @router.patch("/{application_id}/status", response_model=ApplicationDetail)
