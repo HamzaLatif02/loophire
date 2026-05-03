@@ -41,9 +41,10 @@ function fitColor(score) {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [apps, setApps]     = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState('')
+  const [apps, setApps]         = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
+  const [analytics, setAnalytics] = useState(null)
 
   // filter + sort state
   const [statusFilter, setStatusFilter] = useState('all')
@@ -55,6 +56,12 @@ export default function DashboardPage() {
       .then((r) => setApps(r.data))
       .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Failed to load applications.'))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    api.get(`/applications/analytics?user_id=${USER_ID}`)
+      .then((r) => setAnalytics(r.data))
+      .catch(() => {})
   }, [])
 
   // ── derived stats ────────────────────────────────────────────────────────────
@@ -181,6 +188,11 @@ export default function DashboardPage() {
         <StatCard label="Offers"       value={stats.byStatus.offer}        accent="green" />
         <StatCard label="Rejected"     value={stats.byStatus.rejected}     accent="red" />
       </div>
+
+      {/* ── A/B insights ── */}
+      {analytics && analytics.total_applications > 0 && (
+        <ABInsightsSection analytics={analytics} />
+      )}
 
       {/* ── chart ── */}
       {chartData.length > 0 && (
@@ -408,6 +420,91 @@ function SortTh({ label, field, active, dir, onSort }) {
 }
 
 function ChartTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const { name, score, color } = payload[0].payload
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 shadow-xl text-xs">
+      <p className="text-[var(--color-muted)] mb-1">{name}</p>
+      <p className="font-bold tabular-nums" style={{ color }}>{score} / 100</p>
+    </div>
+  )
+}
+
+function ABInsightsSection({ analytics }) {
+  const fitData = [
+    { name: 'Got Response', score: analytics.avg_fit_score_with_response, color: 'var(--color-success)' },
+    { name: 'No Response',  score: analytics.avg_fit_score_without_response, color: 'var(--color-danger)' },
+  ].filter((d) => d.score != null)
+
+  return (
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+      <div className="px-5 py-4 border-b border-[var(--color-border)]">
+        <h2 className="text-sm font-semibold text-[var(--color-text)]">A/B Insights</h2>
+        <p className="text-xs text-[var(--color-muted)] mt-0.5">CV performance across your applications</p>
+      </div>
+
+      <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
+
+        {/* response rate */}
+        <div className="flex flex-col items-center justify-center gap-1 bg-[var(--color-surface-2)] rounded-xl p-5">
+          <p className="text-xs text-[var(--color-muted)] font-medium uppercase tracking-wide">Response Rate</p>
+          <p className="text-5xl font-black tabular-nums" style={{ color: analytics.response_rate >= 30 ? 'var(--color-success)' : analytics.response_rate >= 10 ? 'var(--color-accent)' : 'var(--color-danger)' }}>
+            {analytics.response_rate}%
+          </p>
+          <p className="text-xs text-[var(--color-muted)]">
+            {Math.round(analytics.total_applications * analytics.response_rate / 100)} of {analytics.total_applications} applications
+          </p>
+        </div>
+
+        {/* fit score comparison chart */}
+        <div className="sm:col-span-1">
+          <p className="text-xs text-[var(--color-muted)] font-medium mb-3">Avg Fit Score</p>
+          {fitData.length === 0 ? (
+            <p className="text-xs text-[var(--color-muted)]">Not enough data yet.</p>
+          ) : (
+            <div className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={fitData} barCategoryGap="40%">
+                  <CartesianGrid vertical={false} stroke="var(--color-border)" strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} ticks={[0, 50, 100]} tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }} axisLine={false} tickLine={false} width={28} />
+                  <Tooltip content={<FitCompareTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
+                  <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                    {fitData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} fillOpacity={0.85} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        {/* top keywords */}
+        <div>
+          <p className="text-xs text-[var(--color-muted)] font-medium mb-3">Top Keywords in Responses</p>
+          {analytics.top_keywords_in_successful_apps.length === 0 ? (
+            <p className="text-xs text-[var(--color-muted)]">No data yet — mark applications that got responses.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {analytics.top_keywords_in_successful_apps.map((kw) => (
+                <span
+                  key={kw}
+                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 capitalize"
+                >
+                  {kw}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
+function FitCompareTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   const { name, score, color } = payload[0].payload
   return (

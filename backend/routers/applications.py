@@ -1,5 +1,6 @@
 import logging
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from typing import List
 
@@ -19,12 +20,14 @@ from models.user import User
 
 logger = logging.getLogger(__name__)
 from schemas.application import (
+    AnalyticsResponse,
     ApplicationDetail,
     ApplicationGenerateRequest,
     ApplicationPatchRequest,
     ApplicationStatusUpdate,
     ApplicationSummary,
     InterviewUpdateRequest,
+    ResponseUpdateRequest,
 )
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
@@ -129,6 +132,57 @@ def get_upcoming_interviews(user_id: int = Query(...), db: Session = Depends(get
     )
 
 
+@router.get("/analytics", response_model=AnalyticsResponse)
+def get_analytics(user_id: int = Query(...), db: Session = Depends(get_db)):
+    apps = db.query(Application).filter(Application.user_id == user_id).all()
+    total = len(apps)
+    if total == 0:
+        return AnalyticsResponse(
+            total_applications=0,
+            response_rate=0.0,
+            avg_fit_score_with_response=None,
+            avg_fit_score_without_response=None,
+            response_by_type={},
+            top_keywords_in_successful_apps=[],
+        )
+
+    responded = [a for a in apps if a.got_response]
+    response_rate = round(len(responded) / total * 100, 1)
+
+    def _avg_fit(subset):
+        scored = [a.fit_score for a in subset if a.fit_score is not None]
+        return round(sum(scored) / len(scored), 1) if scored else None
+
+    avg_with = _avg_fit(responded)
+    avg_without = _avg_fit([a for a in apps if not a.got_response])
+
+    type_counts: Counter = Counter()
+    for a in responded:
+        if a.response_type:
+            type_counts[a.response_type] += 1
+
+    keyword_counter: Counter = Counter()
+    for a in responded:
+        gaps = a.keyword_gaps or []
+        for kw in gaps:
+            if isinstance(kw, str):
+                keyword_counter[kw.lower()] += 1
+            elif isinstance(kw, dict):
+                word = kw.get("keyword") or kw.get("word") or kw.get("term")
+                if word:
+                    keyword_counter[str(word).lower()] += 1
+    top_keywords = [kw for kw, _ in keyword_counter.most_common(10)]
+
+    return AnalyticsResponse(
+        total_applications=total,
+        response_rate=response_rate,
+        avg_fit_score_with_response=avg_with,
+        avg_fit_score_without_response=avg_without,
+        response_by_type=dict(type_counts),
+        top_keywords_in_successful_apps=top_keywords,
+    )
+
+
 @router.get("/{application_id}", response_model=ApplicationDetail)
 def get_application(application_id: int, user_id: int, db: Session = Depends(get_db)):
     _get_user(user_id, db)
@@ -198,6 +252,26 @@ def update_interview(
         application.interview_date = body.interview_date
     if body.interview_notes is not None:
         application.interview_notes = body.interview_notes
+    db.commit()
+    db.refresh(application)
+    return application
+
+
+@router.patch("/{application_id}/response", response_model=ApplicationDetail)
+def update_response(
+    application_id: int,
+    body: ResponseUpdateRequest,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    _get_user(user_id, db)
+    application = _get_application(application_id, user_id, db)
+    application.got_response = body.got_response
+    application.response_type = body.response_type if body.got_response else None
+    if body.got_response and application.response_date is None:
+        application.response_date = datetime.now(timezone.utc)
+    elif not body.got_response:
+        application.response_date = None
     db.commit()
     db.refresh(application)
     return application

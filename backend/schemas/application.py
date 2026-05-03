@@ -6,6 +6,9 @@ from pydantic import BaseModel
 from models.application import ApplicationStatus
 
 
+RESPONSE_TYPES = ["recruiter screen", "technical interview", "rejection", "offer"]
+
+
 class ApplicationGenerateRequest(BaseModel):
     user_id: int
     job_title: str
@@ -21,6 +24,8 @@ class ApplicationSummary(BaseModel):
     status: ApplicationStatus
     created_at: datetime
     interview_date: Optional[datetime] = None
+    got_response: bool = False
+    response_type: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -42,6 +47,9 @@ class ApplicationDetail(BaseModel):
     notes: Optional[str]
     interview_date: Optional[datetime] = None
     interview_notes: Optional[str] = None
+    got_response: bool = False
+    response_date: Optional[datetime] = None
+    response_type: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -60,3 +68,17 @@ class ApplicationPatchRequest(BaseModel):
 class InterviewUpdateRequest(BaseModel):
     interview_date: Optional[datetime] = None
     interview_notes: Optional[str] = None
+
+
+class ResponseUpdateRequest(BaseModel):
+    got_response: bool
+    response_type: Optional[str] = None
+
+
+class AnalyticsResponse(BaseModel):
+    total_applications: int
+    response_rate: float
+    avg_fit_score_with_response: Optional[float]
+    avg_fit_score_without_response: Optional[float]
+    response_by_type: Dict[str, int]
+    top_keywords_in_successful_apps: List[str]

@@ -12,6 +12,13 @@ const USER_ID = 1 // placeholder until auth is implemented
 
 const TABS = ['Tailored CV', 'Cover Letter', 'Analysis']
 
+const RESPONSE_TYPE_OPTIONS = [
+  'recruiter screen',
+  'technical interview',
+  'rejection',
+  'offer',
+]
+
 const STATUS_OPTIONS = [
   { value: 'draft',        label: 'Draft' },
   { value: 'applied',      label: 'Applied' },
@@ -64,6 +71,10 @@ export default function ApplicationDetailPage() {
   const [interviewNotes, setInterviewNotes] = useState('')
   const [savingInterview, setSavingInterview] = useState(false)
   const [interviewSaved, setInterviewSaved] = useState(false)
+  const [gotResponse, setGotResponse]       = useState(false)
+  const [responseType, setResponseType]     = useState('')
+  const [savingResponse, setSavingResponse] = useState(false)
+  const [responseSaved, setResponseSaved]   = useState(false)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -73,11 +84,13 @@ export default function ApplicationDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  // Sync interview fields once when the application first loads
+  // Sync interview + response fields once when the application first loads
   useEffect(() => {
     if (!app) return
     setInterviewDate(toDatetimeLocal(app.interview_date))
     setInterviewNotes(app.interview_notes ?? '')
+    setGotResponse(app.got_response ?? false)
+    setResponseType(app.response_type ?? '')
   }, [app?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // close status dropdown on outside click
@@ -109,6 +122,22 @@ export default function ApplicationDetailPage() {
       setTimeout(() => setInterviewSaved(false), 2000)
     } catch { /* non-critical */ } finally {
       setSavingInterview(false)
+    }
+  }
+
+  async function saveResponse(newGotResponse, newResponseType) {
+    if (savingResponse) return
+    setSavingResponse(true)
+    try {
+      const r = await api.patch(`/applications/${id}/response?user_id=${USER_ID}`, {
+        got_response: newGotResponse,
+        response_type: newGotResponse ? (newResponseType || null) : null,
+      })
+      setApp(r.data)
+      setResponseSaved(true)
+      setTimeout(() => setResponseSaved(false), 2000)
+    } catch { /* non-critical */ } finally {
+      setSavingResponse(false)
     }
   }
 
@@ -268,6 +297,61 @@ export default function ApplicationDetailPage() {
               Save Interview Details
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ── response tracking ── */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-[var(--color-text)]">Response Tracking</h2>
+          {responseSaved && <span className="text-xs text-green-500">Saved!</span>}
+          {savingResponse && <span className="text-xs text-[var(--color-muted)]">Saving…</span>}
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          {/* toggle */}
+          <button
+            onClick={() => {
+              const next = !gotResponse
+              setGotResponse(next)
+              if (!next) setResponseType('')
+              saveResponse(next, next ? responseType : '')
+            }}
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+              gotResponse
+                ? 'bg-[var(--color-success)]/10 border-[var(--color-success)]/30 text-[var(--color-success)]'
+                : 'bg-[var(--color-surface-2)] border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            <span className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
+              gotResponse
+                ? 'bg-[var(--color-success)] border-[var(--color-success)]'
+                : 'border-[var(--color-border)]'
+            }`}>
+              {gotResponse && (
+                <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </span>
+            Got a response?
+          </button>
+
+          {/* response type dropdown */}
+          {gotResponse && (
+            <select
+              value={responseType}
+              onChange={(e) => {
+                setResponseType(e.target.value)
+                saveResponse(true, e.target.value)
+              }}
+              className="flex-1 sm:max-w-xs bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-colors cursor-pointer capitalize"
+            >
+              <option value="">Select response type…</option>
+              {RESPONSE_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t} className="capitalize">{t}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 

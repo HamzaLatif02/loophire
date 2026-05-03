@@ -1,6 +1,6 @@
 import enum
 from sqlalchemy import (
-    Column, Integer, String, Text, Float, JSON,
+    Boolean, Column, Integer, String, Text, Float, JSON,
     DateTime, ForeignKey, Enum,
 )
 from sqlalchemy.orm import relationship
@@ -42,5 +42,9 @@ class Application(Base):
     notes = Column(Text, nullable=True)
     interview_date = Column(DateTime(timezone=True), nullable=True)
     interview_notes = Column(Text, nullable=True)
+
+    got_response = Column(Boolean, nullable=False, default=False, server_default='false')
+    response_date = Column(DateTime(timezone=True), nullable=True)
+    response_type = Column(String, nullable=True)
 
     user = relationship("User", back_populates="applications")
