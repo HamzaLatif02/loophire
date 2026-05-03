@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from agents.fit_agent import analyse_fit
+from agents.interview_agent import generate_interview_prep
 from agents.writer_agent import write_application
 from database import get_db
 from services.latex_export_service import generate_cv_pdf
@@ -272,6 +273,33 @@ def update_response(
         application.response_date = datetime.now(timezone.utc)
     elif not body.got_response:
         application.response_date = None
+    db.commit()
+    db.refresh(application)
+    return application
+
+
+@router.post("/{application_id}/interview-prep", response_model=ApplicationDetail)
+def create_interview_prep(
+    application_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    user = _get_user(user_id, db)
+    application = _get_application(application_id, user_id, db)
+
+    if not application.job_description:
+        raise HTTPException(status_code=400, detail="No job description on this application.")
+
+    cv_text = user.base_cv_text or application.tailored_cv or ""
+    if not cv_text:
+        raise HTTPException(status_code=400, detail="No CV text available — upload a CV first.")
+
+    try:
+        prep = generate_interview_prep(application.job_description, cv_text)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=f"Interview prep generation failed: {exc}")
+
+    application.interview_prep = prep
     db.commit()
     db.refresh(application)
     return application

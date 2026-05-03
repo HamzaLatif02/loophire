@@ -10,7 +10,7 @@ const USER_ID = 1 // placeholder until auth is implemented
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
-const TABS = ['Tailored CV', 'Cover Letter', 'Analysis']
+const TABS = ['Tailored CV', 'Cover Letter', 'Analysis', 'Interview Prep']
 
 const RESPONSE_TYPE_OPTIONS = [
   'recruiter screen',
@@ -73,8 +73,10 @@ export default function ApplicationDetailPage() {
   const [interviewSaved, setInterviewSaved] = useState(false)
   const [gotResponse, setGotResponse]       = useState(false)
   const [responseType, setResponseType]     = useState('')
-  const [savingResponse, setSavingResponse] = useState(false)
-  const [responseSaved, setResponseSaved]   = useState(false)
+  const [savingResponse, setSavingResponse]     = useState(false)
+  const [responseSaved, setResponseSaved]       = useState(false)
+  const [generatingPrep, setGeneratingPrep]     = useState(false)
+  const [prepError, setPrepError]               = useState('')
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -138,6 +140,20 @@ export default function ApplicationDetailPage() {
       setTimeout(() => setResponseSaved(false), 2000)
     } catch { /* non-critical */ } finally {
       setSavingResponse(false)
+    }
+  }
+
+  async function generateInterviewPrep() {
+    if (generatingPrep) return
+    setGeneratingPrep(true)
+    setPrepError('')
+    try {
+      const r = await api.post(`/applications/${id}/interview-prep?user_id=${USER_ID}`)
+      setApp(r.data)
+    } catch (err) {
+      setPrepError(err.response?.data?.detail ?? 'Failed to generate interview questions.')
+    } finally {
+      setGeneratingPrep(false)
     }
   }
 
@@ -395,6 +411,14 @@ export default function ApplicationDetailPage() {
         {activeTab === 2 && (
           <AnalysisPanel app={app} score={score} color={color} fitLabel={fitLabel} />
         )}
+        {activeTab === 3 && (
+          <InterviewPrepPanel
+            app={app}
+            onGenerate={generateInterviewPrep}
+            generating={generatingPrep}
+            error={prepError}
+          />
+        )}
       </div>
 
     </div>
@@ -555,6 +579,165 @@ function AnalysisPanel({ app, score, color, fitLabel }) {
       )}
 
     </div>
+  )
+}
+
+// ─── interview prep panel ─────────────────────────────────────────────────────
+
+const PREP_SECTIONS = [
+  { key: 'technical',   label: 'Technical',   color: 'text-blue-400',                    bg: 'bg-blue-500/10',                    border: 'border-blue-500/20' },
+  { key: 'behavioural', label: 'Behavioural', color: 'text-[var(--color-accent)]',        bg: 'bg-[var(--color-accent)]/10',        border: 'border-[var(--color-accent)]/20' },
+  { key: 'cv_based',    label: 'CV-Based',    color: 'text-[var(--color-success)]',       bg: 'bg-[var(--color-success)]/10',       border: 'border-[var(--color-success)]/20' },
+]
+
+function InterviewPrepPanel({ app, onGenerate, generating, error }) {
+  const prep = app.interview_prep
+
+  if (!prep) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-5 text-center">
+        <div className="w-14 h-14 rounded-full bg-[var(--color-surface-2)] border border-[var(--color-border)] flex items-center justify-center">
+          <svg className="w-7 h-7 text-[var(--color-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-text)]">No interview questions yet</p>
+          <p className="text-xs text-[var(--color-muted)] mt-1 max-w-xs">
+            Generate role-specific technical, behavioural, and CV-based questions with STAR answer frameworks.
+          </p>
+        </div>
+        {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+        <button
+          onClick={onGenerate}
+          disabled={generating}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {generating ? <><Spinner size={14} /> Generating…</> : 'Generate Interview Questions'}
+        </button>
+      </div>
+    )
+  }
+
+  const total = (prep.technical?.length ?? 0) + (prep.behavioural?.length ?? 0) + (prep.cv_based?.length ?? 0)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-[var(--color-muted)]">{total} question{total !== 1 ? 's' : ''} across 3 categories</p>
+        <button
+          onClick={onGenerate}
+          disabled={generating}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] disabled:opacity-50 transition-colors"
+        >
+          {generating ? <><Spinner size={11} />Regenerating…</> : 'Regenerate'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
+      {PREP_SECTIONS.map(({ key, label, color, bg, border }) => (
+        <PrepSection
+          key={key}
+          label={label}
+          questions={prep[key] ?? []}
+          color={color}
+          bg={bg}
+          border={border}
+        />
+      ))}
+    </div>
+  )
+}
+
+function PrepSection({ label, questions, color, bg, border }) {
+  const [open, setOpen] = useState(true)
+  const [expanded, setExpanded] = useState({})
+
+  function toggle(i) {
+    setExpanded((prev) => ({ ...prev, [i]: !prev[i] }))
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-border)] hover:bg-[var(--color-surface-2)] transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${bg} ${color} border ${border}`}>
+            {label}
+          </span>
+          <span className="text-xs text-[var(--color-muted)]">{questions.length} question{questions.length !== 1 ? 's' : ''}</span>
+        </div>
+        <svg className={`w-4 h-4 text-[var(--color-muted)] transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      {open && (
+        <ul className="divide-y divide-[var(--color-border)]">
+          {questions.map((item, i) => (
+            <li key={i} className="px-5 py-4 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-medium text-[var(--color-text)] leading-relaxed flex-1">
+                  {i + 1}. {item.question}
+                </p>
+                <PrepCopyButton text={`Q: ${item.question}\n\nFramework: ${item.framework}`} />
+              </div>
+
+              <button
+                onClick={() => toggle(i)}
+                className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                  expanded[i] ? color : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                <svg className={`w-3.5 h-3.5 transition-transform ${expanded[i] ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+                {expanded[i] ? 'Hide' : 'Show'} answer framework
+              </button>
+
+              {expanded[i] && (
+                <div className={`rounded-lg border ${border} ${bg} px-4 py-3`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${color}`}>STAR Framework</p>
+                  <p className="text-sm text-[var(--color-text)] leading-relaxed">{item.framework}</p>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function PrepCopyButton({ text }) {
+  const [copied, setCopied] = useState(false)
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {}
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copy question and framework"
+      className="shrink-0 p-1.5 rounded-md text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)] transition-colors"
+    >
+      {copied ? (
+        <svg className="w-3.5 h-3.5 text-[var(--color-success)]" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      ) : (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+        </svg>
+      )}
+    </button>
   )
 }
 

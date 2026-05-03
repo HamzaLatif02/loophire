@@ -50,6 +50,7 @@ class ApplicationDetail(BaseModel):
     got_response: bool = False
     response_date: Optional[datetime] = None
     response_type: Optional[str] = None
+    interview_prep: Optional[Dict[str, Any]] = None
     created_at: datetime
 
     class Config:
