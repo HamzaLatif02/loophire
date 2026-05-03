@@ -40,5 +40,7 @@ class Application(Base):
         default=ApplicationStatus.draft,
     )
     notes = Column(Text, nullable=True)
+    interview_date = Column(DateTime(timezone=True), nullable=True)
+    interview_notes = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="applications")

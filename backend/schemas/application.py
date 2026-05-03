@@ -20,6 +20,7 @@ class ApplicationSummary(BaseModel):
     fit_score: Optional[float]
     status: ApplicationStatus
     created_at: datetime
+    interview_date: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -39,6 +40,8 @@ class ApplicationDetail(BaseModel):
     company_research: Optional[Dict[str, Any]]
     status: ApplicationStatus
     notes: Optional[str]
+    interview_date: Optional[datetime] = None
+    interview_notes: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -52,3 +55,8 @@ class ApplicationStatusUpdate(BaseModel):
 class ApplicationPatchRequest(BaseModel):
     tailored_cv_json: Optional[Dict[str, Any]] = None
     cover_letter: Optional[str] = None
+
+
+class InterviewUpdateRequest(BaseModel):
+    interview_date: Optional[datetime] = None
+    interview_notes: Optional[str] = None

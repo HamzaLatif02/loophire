@@ -44,15 +44,26 @@ function scoreFitLabel(score) {
 
 // ─── page ────────────────────────────────────────────────────────────────────
 
+function toDatetimeLocal(isoStr) {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function ApplicationDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [app, setApp]               = useState(null)
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState('')
-  const [activeTab, setActiveTab]   = useState(0)
-  const [savingStatus, setSaving]   = useState(false)
-  const [statusOpen, setStatusOpen] = useState(false)
+  const [app, setApp]                       = useState(null)
+  const [loading, setLoading]               = useState(true)
+  const [error, setError]                   = useState('')
+  const [activeTab, setActiveTab]           = useState(0)
+  const [savingStatus, setSaving]           = useState(false)
+  const [statusOpen, setStatusOpen]         = useState(false)
+  const [interviewDate, setInterviewDate]   = useState('')
+  const [interviewNotes, setInterviewNotes] = useState('')
+  const [savingInterview, setSavingInterview] = useState(false)
+  const [interviewSaved, setInterviewSaved] = useState(false)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -61,6 +72,13 @@ export default function ApplicationDetailPage() {
       .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Application not found.'))
       .finally(() => setLoading(false))
   }, [id])
+
+  // Sync interview fields once when the application first loads
+  useEffect(() => {
+    if (!app) return
+    setInterviewDate(toDatetimeLocal(app.interview_date))
+    setInterviewNotes(app.interview_notes ?? '')
+  }, [app?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // close status dropdown on outside click
   useEffect(() => {
@@ -76,6 +94,22 @@ export default function ApplicationDetailPage() {
   async function patchApplication(fields) {
     const r = await api.patch(`/applications/${id}?user_id=${USER_ID}`, fields)
     setApp(r.data)
+  }
+
+  async function saveInterview() {
+    if (savingInterview) return
+    setSavingInterview(true)
+    try {
+      const r = await api.patch(`/applications/${id}/interview?user_id=${USER_ID}`, {
+        interview_date: interviewDate || null,
+        interview_notes: interviewNotes || null,
+      })
+      setApp(r.data)
+      setInterviewSaved(true)
+      setTimeout(() => setInterviewSaved(false), 2000)
+    } catch { /* non-critical */ } finally {
+      setSavingInterview(false)
+    }
   }
 
   async function changeStatus(status) {
@@ -195,6 +229,45 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
 
+        </div>
+      </div>
+
+      {/* ── interview details ── */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-[var(--color-text)]">Interview Details</h2>
+          {interviewSaved && <span className="text-xs text-green-500">Saved!</span>}
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-[var(--color-muted)] mb-1 block">Date &amp; Time</label>
+            <input
+              type="datetime-local"
+              value={interviewDate}
+              onChange={(e) => setInterviewDate(e.target.value)}
+              className="w-full bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-[var(--color-muted)] mb-1 block">Notes</label>
+            <textarea
+              value={interviewNotes}
+              onChange={(e) => setInterviewNotes(e.target.value)}
+              rows={3}
+              placeholder="Interviewer name, format (technical / behavioural), topics to prepare…"
+              className="w-full bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors resize-none"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={saveInterview}
+              disabled={savingInterview}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {savingInterview && <Spinner size={12} />}
+              Save Interview Details
+            </button>
+          </div>
         </div>
       </div>
 

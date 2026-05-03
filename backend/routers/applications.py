@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,6 +24,7 @@ from schemas.application import (
     ApplicationPatchRequest,
     ApplicationStatusUpdate,
     ApplicationSummary,
+    InterviewUpdateRequest,
 )
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
@@ -112,6 +114,21 @@ def list_applications(user_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/upcoming-interviews", response_model=List[ApplicationSummary])
+def get_upcoming_interviews(user_id: int = Query(...), db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    return (
+        db.query(Application)
+        .filter(
+            Application.user_id == user_id,
+            Application.interview_date.isnot(None),
+            Application.interview_date > now,
+        )
+        .order_by(Application.interview_date.asc())
+        .all()
+    )
+
+
 @router.get("/{application_id}", response_model=ApplicationDetail)
 def get_application(application_id: int, user_id: int, db: Session = Depends(get_db)):
     _get_user(user_id, db)
@@ -163,6 +180,24 @@ def update_status(
     _get_user(user_id, db)
     application = _get_application(application_id, user_id, db)
     application.status = body.status
+    db.commit()
+    db.refresh(application)
+    return application
+
+
+@router.patch("/{application_id}/interview", response_model=ApplicationDetail)
+def update_interview(
+    application_id: int,
+    body: InterviewUpdateRequest,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    _get_user(user_id, db)
+    application = _get_application(application_id, user_id, db)
+    if body.interview_date is not None:
+        application.interview_date = body.interview_date
+    if body.interview_notes is not None:
+        application.interview_notes = body.interview_notes
     db.commit()
     db.refresh(application)
     return application
