@@ -7,6 +7,7 @@ function formatInterviewDate(isoStr) {
   return new Date(isoStr).toLocaleString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short',
     hour: '2-digit', minute: '2-digit',
+    timeZone: 'UTC',
   })
 }
 import {
