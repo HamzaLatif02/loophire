@@ -75,21 +75,12 @@ def normalise_job_url(url: str) -> str:
         if job_id:
             return f"https://www.linkedin.com/jobs/view/{job_id}/"
 
-    # Indeed (any subdomain: uk, ca, au, www, …) — strip all tracking,
-    # keep only the jk job ID, preserve the original subdomain
-    if "indeed.com" in url:
-        job_id = params.get("jk", [None])[0]
-        if job_id:
-            subdomain = parsed.netloc  # e.g. uk.indeed.com
-            return f"https://{subdomain}/viewjob?jk={job_id}"
-
     return url
 
 
 def _should_use_tavily_directly(url: str) -> bool:
     """Return True for sites that serve JS-rendered pages httpx cannot parse."""
-    js_heavy_domains = ["indeed.com", "linkedin.com"]
-    return any(domain in url for domain in js_heavy_domains)
+    return "linkedin.com" in url
 
 
 def _validate_url(url: str) -> None:

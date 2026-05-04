@@ -10,6 +10,7 @@ from database import SessionLocal
 from models.user import User
 from routers import applications as applications_router
 from routers import cv as cv_router
+from routers import jobs as jobs_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +43,7 @@ def root():
 
 app.include_router(cv_router.router, prefix="/api/cv")
 app.include_router(applications_router.router)
+app.include_router(jobs_router.router)
 
 
 # ── startup ───────────────────────────────────────────────────────────────────
@@ -52,7 +54,8 @@ def startup_check() -> None:
 
     # Log which required env vars are present (values never printed)
     required = ["DATABASE_URL", "ANTHROPIC_API_KEY", "TAVILY_API_KEY"]
-    optional = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"]
+    optional = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN",
+                "REED_API_KEY", "ADZUNA_APP_ID", "ADZUNA_APP_KEY"]
     import os
     for var in required:
         if os.getenv(var):
