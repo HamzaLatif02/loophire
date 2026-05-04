@@ -6,7 +6,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import anthropic
-import httpx
+from curl_cffi import requests as curl_requests
 from readability import Document
 
 logger = logging.getLogger("loophire.services.job_scraper")
@@ -14,10 +14,10 @@ logger = logging.getLogger("loophire.services.job_scraper")
 _MODEL = "claude-haiku-4-5-20251001"
 _client: Optional[anthropic.Anthropic] = None
 
-_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; Loophire/1.0)",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
+# curl_cffi handles TLS fingerprinting; these supplement the impersonation headers
+_EXTRA_HEADERS = {
+    "Accept-Language": "en-GB,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 }
 
 _EXTRACT_SYSTEM = (
@@ -76,10 +76,16 @@ def scrape_job(url: str) -> dict:
         raise ValueError(str(exc)) from exc
 
     try:
-        response = httpx.get(url, headers=_HEADERS, timeout=15, follow_redirects=True)
-    except httpx.TimeoutException:
+        response = curl_requests.get(
+            url,
+            impersonate="chrome120",
+            headers=_EXTRA_HEADERS,
+            timeout=15,
+            allow_redirects=True,
+        )
+    except curl_requests.exceptions.Timeout:
         raise RuntimeError("Request timed out — the site took too long to respond.")
-    except httpx.RequestError as exc:
+    except curl_requests.exceptions.RequestException as exc:
         raise RuntimeError(f"Could not reach the URL: {exc}")
 
     if response.status_code == 403:

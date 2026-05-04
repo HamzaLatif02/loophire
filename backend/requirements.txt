@@ -12,3 +12,4 @@ python-multipart
 reportlab
 lxml
 readability-lxml
+curl-cffi
