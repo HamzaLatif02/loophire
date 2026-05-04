@@ -75,12 +75,21 @@ def normalise_job_url(url: str) -> str:
         if job_id:
             return f"https://www.linkedin.com/jobs/view/{job_id}/"
 
-    # Indeed search/redirect with jk param → canonical viewjob URL
-    if "indeed.com" in url and "jk" in params:
-        job_id = params["jk"][0]
-        return f"https://www.indeed.com/viewjob?jk={job_id}"
+    # Indeed (any subdomain: uk, ca, au, www, …) — strip all tracking,
+    # keep only the jk job ID, preserve the original subdomain
+    if "indeed.com" in url:
+        job_id = params.get("jk", [None])[0]
+        if job_id:
+            subdomain = parsed.netloc  # e.g. uk.indeed.com
+            return f"https://{subdomain}/viewjob?jk={job_id}"
 
     return url
+
+
+def _should_use_tavily_directly(url: str) -> bool:
+    """Return True for sites that serve JS-rendered pages httpx cannot parse."""
+    js_heavy_domains = ["indeed.com", "linkedin.com"]
+    return any(domain in url for domain in js_heavy_domains)
 
 
 def _validate_url(url: str) -> None:
@@ -135,13 +144,15 @@ async def _fetch_with_tavily(url: str) -> str:
             )
         logger.info(f"job_scraper: Tavily extract status: {resp.status_code}")
         if resp.status_code != 200:
+            logger.warning(f"job_scraper: Tavily returned non-200: {resp.text[:200]}")
             return ""
         data = resp.json()
         results = data.get("results", [])
         if results:
             content = results[0].get("raw_content", "")
-            logger.info(f"job_scraper: Tavily content length: {len(content)} chars")
+            logger.info(f"job_scraper: Tavily extracted content length: {len(content)} chars")
             return content
+        logger.warning("job_scraper: Tavily returned no results")
         return ""
     except Exception as exc:
         logger.warning(f"job_scraper: Tavily extract failed: {exc}")
@@ -218,33 +229,42 @@ async def scrape_job(url: str) -> dict:
 
     text = ""
 
-    # ── step 1: curl_cffi ───────────────────────────────────────────────────
-    try:
-        status_code, html = await _fetch_with_curl(url)
-        logger.info(f"job_scraper: HTTP response status: {status_code}")
-        logger.info(f"job_scraper: response length: {len(html)} chars")
+    if _should_use_tavily_directly(url):
+        # ── JS-heavy site: go straight to Tavily ────────────────────────────
+        logger.info(f"job_scraper: known JS-heavy site — skipping curl, using Tavily directly")
+        text = await _fetch_with_tavily(url)
+    else:
+        # ── step 1: curl_cffi ───────────────────────────────────────────────
+        try:
+            status_code, html = await _fetch_with_curl(url)
+            logger.info(f"job_scraper: HTTP response status: {status_code}")
+            logger.info(f"job_scraper: response length: {len(html)} chars")
 
-        if status_code in _BLOCKED_CODES:
-            logger.warning(f"job_scraper: site returned {status_code} — trying Tavily fallback")
-        elif status_code != 200:
-            logger.warning(f"job_scraper: unexpected status {status_code} — trying Tavily fallback")
-        else:
-            text = _extract_text(html)
+            if status_code in _BLOCKED_CODES:
+                logger.warning(f"job_scraper: site returned {status_code} — trying Tavily fallback")
+            elif status_code != 200:
+                logger.warning(f"job_scraper: unexpected status {status_code} — trying Tavily fallback")
+            else:
+                text = _extract_text(html)
 
-    except Exception as exc:
-        logger.warning(f"job_scraper: curl_cffi fetch failed: {exc} — trying Tavily fallback")
+        except Exception as exc:
+            logger.warning(f"job_scraper: curl_cffi fetch failed: {exc} — trying Tavily fallback")
 
-    # ── step 2: Tavily fallback ─────────────────────────────────────────────
+        # ── step 2: Tavily fallback ─────────────────────────────────────────
+        if len(text) < 200:
+            logger.info("job_scraper: primary fetch yielded insufficient content, falling back to Tavily")
+            tavily_text = await _fetch_with_tavily(url)
+            if len(tavily_text) > len(text):
+                text = tavily_text
+
+    logger.info(f"job_scraper: total extracted content length: {len(text)} chars")
+
+    # ── give up cleanly ─────────────────────────────────────────────────────
     if len(text) < 200:
-        logger.info("job_scraper: primary fetch yielded insufficient content, falling back to Tavily")
-        tavily_text = await _fetch_with_tavily(url)
-        if len(tavily_text) > len(text):
-            text = tavily_text
-
-    # ── step 3: give up cleanly ─────────────────────────────────────────────
-    if len(text) < 100:
         raise ValueError(
-            "This job board blocks automated access. Please copy and paste the job description manually."
+            "Could not extract job description from this URL. "
+            "Try opening the job in a new browser tab, copying the clean URL "
+            "from the address bar, and pasting it here."
         )
 
     return _call_claude(text)
