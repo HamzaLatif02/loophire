@@ -37,8 +37,10 @@ _CV_SYSTEM_BASE = (
 _COVER_LETTER_SYSTEM_BASE = (
     "You are an expert cover letter writer. "
     "You write concise, compelling cover letters that feel personal and specific — never generic. "
-    "Structure: three paragraphs only — (1) a strong hook referencing the role and why this candidate, "
-    "(2) two or three concrete evidence points from the CV that match the role, "
+    "CRITICAL: Write exclusively in the FIRST PERSON — use 'I', 'my', 'I have', 'I built', etc. "
+    "Never refer to the candidate in the third person (e.g. never write their name, 'the candidate', 'their skills'). "
+    "Structure: three paragraphs only — (1) a strong hook referencing the role and why I am applying, "
+    "(2) two or three concrete evidence points from my CV that match the role, "
     "(3) a confident close that references the company specifically. "
     "Return plain text only — no subject line, no date, no address block, no markdown."
 )
@@ -290,9 +292,10 @@ JSON SCHEMA (return exactly this structure):
 Write a cover letter for the application below.
 
 RULES:
+- Write entirely in the first person: "I", "my", "I developed", "I led". Never use the candidate's name or third-person pronouns.
 - Exactly 3 paragraphs: hook → evidence → close.
-- The hook must name the role and explain why this candidate specifically.
-- The evidence paragraph must cite 2-3 concrete, specific achievements or skills from the CV.
+- The hook must name the role and explain why I am excited about it specifically.
+- The evidence paragraph must cite 2-3 concrete, specific achievements or skills from my CV.
 - The close must reference something specific about the company (culture, mission, product).
 - Warm but professional tone. No clichés ("I am writing to apply…").
 - Plain text only.
