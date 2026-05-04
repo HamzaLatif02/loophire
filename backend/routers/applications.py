@@ -4,7 +4,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from agents.fit_agent import analyse_fit
 from agents.interview_agent import generate_interview_prep
 from agents.writer_agent import write_application
 from database import get_db
+from services.job_scraper_service import scrape_job
 from services.latex_export_service import generate_cv_pdf
 from services.memory_service import get_preferences
 from services.pdf_export_service import generate_pdf
@@ -50,6 +51,16 @@ def _get_application(application_id: int, user_id: int, db: Session) -> Applicat
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     return app
+
+
+@router.post("/scrape-job")
+def scrape_job_endpoint(url: str = Body(..., embed=True)):
+    try:
+        return scrape_job(url)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @router.post("/generate", response_model=ApplicationDetail, status_code=201)

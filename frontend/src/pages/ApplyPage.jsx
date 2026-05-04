@@ -26,6 +26,11 @@ export default function ApplyPage() {
   const [error, setError] = useState('')
   const intervalRef = useRef(null)
 
+  const [importUrl, setImportUrl]       = useState('')
+  const [importing, setImporting]       = useState(false)
+  const [importError, setImportError]   = useState('')
+  const [importedUrl, setImportedUrl]   = useState('')
+
   useEffect(() => {
     if (loading) {
       setStepIdx(0)
@@ -37,6 +42,28 @@ export default function ApplyPage() {
     }
     return () => clearInterval(intervalRef.current)
   }, [loading])
+
+  async function importJob() {
+    const url = importUrl.trim()
+    if (!url) return
+    setImporting(true)
+    setImportError('')
+    setImportedUrl('')
+    try {
+      const res = await api.post('/applications/scrape-job', { url })
+      setForm({
+        job_title: res.data.job_title || '',
+        company_name: res.data.company_name || '',
+        job_description: res.data.job_description || '',
+      })
+      setImportedUrl(url)
+    } catch (err) {
+      const detail = err.response?.data?.detail ?? 'Could not import this URL — please paste the job description manually.'
+      setImportError(detail)
+    } finally {
+      setImporting(false)
+    }
+  }
 
   function set(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
@@ -68,6 +95,52 @@ export default function ApplyPage() {
         <p className="text-sm text-[var(--color-muted)] mt-1">
           Paste the job description and Loophire handles the rest.
         </p>
+      </div>
+
+      {/* ── URL importer ── */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-text)]">Import from URL</p>
+          <p className="text-xs text-[var(--color-muted)] mt-0.5">Paste a LinkedIn or Indeed job listing URL to auto-fill the form.</p>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={importUrl}
+            onChange={(e) => { setImportUrl(e.target.value); setImportError('') }}
+            onKeyDown={(e) => e.key === 'Enter' && importJob()}
+            placeholder="https://www.linkedin.com/jobs/view/…"
+            disabled={importing || loading}
+            className={`${inputCls} flex-1`}
+          />
+          <button
+            type="button"
+            onClick={importJob}
+            disabled={importing || loading || !importUrl.trim()}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] text-sm font-medium text-[var(--color-text)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+          >
+            {importing ? <><Spinner size={13} /> Importing…</> : 'Import'}
+          </button>
+        </div>
+
+        {importError && (
+          <p className="text-xs text-[var(--color-danger)]">{importError}</p>
+        )}
+        {importedUrl && !importError && (
+          <p className="text-xs text-[var(--color-success)] flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            Job listing imported — review the fields below and click Generate.
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1 border-t border-[var(--color-border)]" />
+        <span className="text-xs text-[var(--color-muted)] font-medium">or fill in manually</span>
+        <div className="flex-1 border-t border-[var(--color-border)]" />
       </div>
 
       {/* Loading overlay */}

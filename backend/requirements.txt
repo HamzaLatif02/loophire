@@ -10,3 +10,5 @@ httpx
 pdfplumber
 python-multipart
 reportlab
+lxml
+readability-lxml
