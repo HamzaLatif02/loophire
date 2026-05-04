@@ -30,6 +30,7 @@ export default function ApplyPage() {
   const [importing, setImporting]       = useState(false)
   const [importError, setImportError]   = useState('')
   const [importedUrl, setImportedUrl]   = useState('')
+  const jdRef = useRef(null)
 
   useEffect(() => {
     if (loading) {
@@ -58,8 +59,13 @@ export default function ApplyPage() {
       })
       setImportedUrl(url)
     } catch (err) {
+      const status = err.response?.status
       const detail = err.response?.data?.detail ?? 'Could not import this URL — please paste the job description manually.'
       setImportError(detail)
+      // For blocked sites (422) or timeouts (408), focus the JD field so the user can paste
+      if (status === 422 || status === 408) {
+        setTimeout(() => jdRef.current?.focus(), 50)
+      }
     } finally {
       setImporting(false)
     }
@@ -214,6 +220,7 @@ export default function ApplyPage() {
 
         <Field label="Job Description">
           <textarea
+            ref={jdRef}
             value={form.job_description}
             onChange={set('job_description')}
             placeholder="Paste the full job description here…"

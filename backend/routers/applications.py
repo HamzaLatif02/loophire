@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from collections import Counter
@@ -54,9 +55,14 @@ def _get_application(application_id: int, user_id: int, db: Session) -> Applicat
 
 
 @router.post("/scrape-job")
-def scrape_job_endpoint(url: str = Body(..., embed=True)):
+async def scrape_job_endpoint(url: str = Body(..., embed=True)):
     try:
-        return scrape_job(url)
+        return await asyncio.wait_for(scrape_job(url), timeout=25.0)
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=408,
+            detail="Job scraping timed out. Please paste the job description manually.",
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except RuntimeError as exc:

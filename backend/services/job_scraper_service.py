@@ -1,23 +1,32 @@
 import html as html_lib
 import json
 import logging
+import os
 import re
 from typing import Optional
 from urllib.parse import urlparse
 
 import anthropic
-from curl_cffi import requests as curl_requests
+import httpx
+from curl_cffi.requests import AsyncSession
+from dotenv import load_dotenv
 from readability import Document
 
-logger = logging.getLogger("loophire.services.job_scraper")
+load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 _MODEL = "claude-haiku-4-5-20251001"
-_client: Optional[anthropic.Anthropic] = None
+_TAVILY_KEY = os.getenv("TAVILY_API_KEY", "")
+_anthropic_client: Optional[anthropic.Anthropic] = None
 
-# curl_cffi handles TLS fingerprinting; these supplement the impersonation headers
-_EXTRA_HEADERS = {
-    "Accept-Language": "en-GB,en;q=0.9",
+# HTTP status codes that indicate the site is actively blocking us
+_BLOCKED_CODES = {403, 429, 999}
+
+# These supplement curl_cffi's built-in Chrome impersonation headers
+_CURL_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-GB,en;q=0.9",
 }
 
 _EXTRACT_SYSTEM = (
@@ -61,61 +70,74 @@ def _strip_html(html_content: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic()
-    return _client
+def _get_anthropic() -> anthropic.Anthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic()
+    return _anthropic_client
 
 
-def scrape_job(url: str) -> dict:
-    """Fetch a job listing URL and extract structured job data via Claude."""
-    try:
-        _validate_url(url)
-    except ValueError as exc:
-        raise ValueError(str(exc)) from exc
-
-    try:
-        response = curl_requests.get(
+async def _fetch_with_curl(url: str) -> tuple[int, str]:
+    """Fetch with curl_cffi Chrome TLS impersonation."""
+    async with AsyncSession() as session:
+        resp = await session.get(
             url,
             impersonate="chrome120",
-            headers=_EXTRA_HEADERS,
+            headers=_CURL_HEADERS,
             timeout=15,
             allow_redirects=True,
         )
-    except curl_requests.exceptions.Timeout:
-        raise RuntimeError("Request timed out — the site took too long to respond.")
-    except curl_requests.exceptions.RequestException as exc:
-        raise RuntimeError(f"Could not reach the URL: {exc}")
+    return resp.status_code, resp.text
 
-    if response.status_code == 403:
-        raise RuntimeError(
-            "This site blocked the request — please paste the job description manually."
-        )
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Site returned status {response.status_code} — please paste the job description manually."
-        )
 
+async def _fetch_with_tavily(url: str) -> str:
+    """Fallback: use Tavily /extract to retrieve page content."""
+    if not _TAVILY_KEY:
+        logger.debug("job_scraper: TAVILY_API_KEY not set — skipping Tavily fallback")
+        return ""
+    logger.info(f"job_scraper: trying Tavily extract for {url}")
     try:
-        doc = Document(response.text)
-        text = _strip_html(doc.summary())
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.tavily.com/extract",
+                json={"urls": [url]},
+                headers={"Authorization": f"Bearer {_TAVILY_KEY}"},
+            )
+        logger.info(f"job_scraper: Tavily extract status: {resp.status_code}")
+        if resp.status_code != 200:
+            return ""
+        data = resp.json()
+        results = data.get("results", [])
+        if results:
+            content = results[0].get("raw_content", "")
+            logger.info(f"job_scraper: Tavily content length: {len(content)} chars")
+            return content
+        return ""
     except Exception as exc:
-        logger.warning("readability parse failed (%s), falling back to raw strip", exc)
-        text = _strip_html(response.text)
+        logger.warning(f"job_scraper: Tavily extract failed: {exc}")
+        return ""
 
-    if len(text) < 100:
-        raise RuntimeError(
-            "Could not extract readable content from this page — please paste the job description manually."
-        )
 
-    # Trim to stay within a sensible token budget
-    text = text[:8000]
+def _extract_text(html_content: str) -> str:
+    """Extract readable text from HTML using readability, falling back to raw strip."""
+    try:
+        doc = Document(html_content)
+        text = _strip_html(doc.summary())
+        logger.info(f"job_scraper: readability extracted {len(text)} chars")
+        return text
+    except Exception as exc:
+        logger.warning(f"job_scraper: readability failed ({exc}), using raw strip")
+        text = _strip_html(html_content)
+        logger.info(f"job_scraper: raw strip extracted {len(text)} chars")
+        return text
 
-    prompt = _EXTRACT_TEMPLATE.format(text=text)
+
+def _call_claude(text: str) -> dict:
+    prompt = _EXTRACT_TEMPLATE.format(text=text[:8000])
+    logger.info("job_scraper: sending to Claude for extraction")
 
     try:
-        message = _get_client().messages.create(
+        message = _get_anthropic().messages.create(
             model=_MODEL,
             max_tokens=1024,
             system=_EXTRACT_SYSTEM,
@@ -124,11 +146,10 @@ def scrape_job(url: str) -> dict:
     except anthropic.APIError as exc:
         raise RuntimeError(f"Claude API error: {exc}") from exc
 
+    logger.info("job_scraper: Claude response received")
     raw = message.content[0].text.strip()
     if not raw:
-        raise RuntimeError(
-            "Could not parse the job listing — please paste the job description manually."
-        )
+        raise RuntimeError("Claude returned empty response — please paste the job description manually.")
 
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw).strip()
@@ -136,13 +157,56 @@ def scrape_job(url: str) -> dict:
     try:
         result = json.loads(raw)
     except json.JSONDecodeError as exc:
-        logger.error("job_scraper: JSON parse failed: %s\nRaw: %.300s", exc, raw)
-        raise RuntimeError(
-            "Could not parse the job listing — please paste the job description manually."
-        )
+        logger.error(f"job_scraper: JSON parse failed: {exc} | raw: {raw[:300]}")
+        raise RuntimeError("Could not parse the job listing — please paste the job description manually.")
 
     return {
         "job_title": result.get("job_title", ""),
         "company_name": result.get("company_name", ""),
         "job_description": result.get("job_description", ""),
     }
+
+
+async def scrape_job(url: str) -> dict:
+    """Fetch a job listing URL and extract structured job data.
+
+    Strategy:
+      1. curl_cffi with Chrome TLS impersonation
+      2. Tavily /extract fallback if blocked or empty
+      3. Raise 422-suitable ValueError if both fail
+    """
+    logger.info(f"job_scraper: scraping URL: {url}")
+    _validate_url(url)
+
+    text = ""
+
+    # ── step 1: curl_cffi ───────────────────────────────────────────────────
+    try:
+        status_code, html = await _fetch_with_curl(url)
+        logger.info(f"job_scraper: HTTP response status: {status_code}")
+        logger.info(f"job_scraper: response length: {len(html)} chars")
+
+        if status_code in _BLOCKED_CODES:
+            logger.warning(f"job_scraper: site returned {status_code} — trying Tavily fallback")
+        elif status_code != 200:
+            logger.warning(f"job_scraper: unexpected status {status_code} — trying Tavily fallback")
+        else:
+            text = _extract_text(html)
+
+    except Exception as exc:
+        logger.warning(f"job_scraper: curl_cffi fetch failed: {exc} — trying Tavily fallback")
+
+    # ── step 2: Tavily fallback ─────────────────────────────────────────────
+    if len(text) < 200:
+        logger.info("job_scraper: primary fetch yielded insufficient content, falling back to Tavily")
+        tavily_text = await _fetch_with_tavily(url)
+        if len(tavily_text) > len(text):
+            text = tavily_text
+
+    # ── step 3: give up cleanly ─────────────────────────────────────────────
+    if len(text) < 100:
+        raise ValueError(
+            "This job board blocks automated access. Please copy and paste the job description manually."
+        )
+
+    return _call_claude(text)
