@@ -90,6 +90,23 @@ export default function ApplyPage() {
   const [importingId, setImportingId]   = useState(null)
   const [searchSuccess, setSearchSuccess] = useState('')
 
+  // ── search filter state ─────────────────────────────────────────────────────
+  const [minSalary, setMinSalary]           = useState('')
+  const [maxSalary, setMaxSalary]           = useState('')
+  const [employmentType, setEmploymentType] = useState('any')
+  const [contractType, setContractType]     = useState('any')
+  const [datePosted, setDatePosted]         = useState('')
+  const [sortBy, setSortBy]                 = useState('relevance')
+
+  function clearFilters() {
+    setMinSalary('')
+    setMaxSalary('')
+    setEmploymentType('any')
+    setContractType('any')
+    setDatePosted('')
+    setSortBy('relevance')
+  }
+
   async function searchJobs() {
     if (!keywords.trim()) return
     setSearching(true)
@@ -97,11 +114,18 @@ export default function ApplyPage() {
     setResults([])
     setSearchSuccess('')
     try {
-      const res = await api.post('/jobs/search', {
+      const payload = {
         keywords: keywords.trim(),
         location: location.trim() || 'London',
         source,
-      })
+      }
+      if (minSalary)                   payload.min_salary = parseInt(minSalary, 10)
+      if (maxSalary)                   payload.max_salary = parseInt(maxSalary, 10)
+      if (employmentType !== 'any')    payload.employment_type = employmentType
+      if (contractType !== 'any')      payload.contract_type = contractType
+      if (datePosted)                  payload.date_posted = datePosted
+      if (sortBy !== 'relevance')      payload.sort_by = sortBy
+      const res = await api.post('/jobs/search', payload)
       setResults(res.data)
       if (res.data.length === 0) setSearchError('No jobs found — try different keywords or location.')
     } catch (err) {
@@ -210,6 +234,13 @@ export default function ApplyPage() {
               results={results}        error={searchError}
               importingId={importingId} onImport={importSearchResult}
               success={searchSuccess}  inputCls={inputCls}
+              minSalary={minSalary}         setMinSalary={setMinSalary}
+              maxSalary={maxSalary}         setMaxSalary={setMaxSalary}
+              employmentType={employmentType} setEmploymentType={setEmploymentType}
+              contractType={contractType}   setContractType={setContractType}
+              datePosted={datePosted}       setDatePosted={setDatePosted}
+              sortBy={sortBy}               setSortBy={setSortBy}
+              onClearFilters={clearFilters}
             />
           )}
           {importTab === 1 && (
@@ -326,12 +357,160 @@ export default function ApplyPage() {
   )
 }
 
+// ─── Filter panel ─────────────────────────────────────────────────────────────
+
+function FiltersPanel({
+  source, inputCls,
+  minSalary, setMinSalary, maxSalary, setMaxSalary,
+  employmentType, setEmploymentType, contractType, setContractType,
+  datePosted, setDatePosted, sortBy, setSortBy, onClear,
+}) {
+  const [open, setOpen] = useState(false)
+
+  const reedDisabled   = source === 'adzuna'
+  const adzunaDisabled = source === 'reed'
+  const reedTitle      = source === 'both' ? 'Reed only — applies when searching Reed' : undefined
+  const adzunaTitle    = source === 'both' ? 'Adzuna only — applies when searching Adzuna' : undefined
+
+  const activeCount = [
+    minSalary !== '',
+    maxSalary !== '',
+    employmentType !== 'any',
+    contractType !== 'any',
+    datePosted !== '',
+    sortBy !== 'relevance',
+  ].filter(Boolean).length
+
+  const labelCls = 'text-xs text-[var(--color-muted)] font-medium flex items-center gap-1.5'
+  const ReedBadge   = () => <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400">Reed</span>
+  const AdzunaBadge = () => <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)]">Adzuna</span>
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-1.5 text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+        >
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L13 10.414V17a1 1 0 01-1.447.894l-4-2A1 1 0 017 15v-4.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+          </svg>
+          {activeCount > 0 ? `Filters (${activeCount})` : 'Filters'}
+          <svg className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+        {activeCount > 0 && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-[var(--color-accent)] hover:underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      <div className={`overflow-hidden transition-all duration-200 ${open ? 'max-h-96 mt-3' : 'max-h-0'}`}>
+        <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)]">
+
+          {/* Minimum Salary — both */}
+          <div className="space-y-1">
+            <label className={labelCls}>Minimum Salary (£)</label>
+            <input
+              type="number"
+              min={0}
+              value={minSalary}
+              onChange={e => setMinSalary(e.target.value)}
+              placeholder="e.g. 40000"
+              className={inputCls}
+            />
+          </div>
+
+          {/* Employment Type — both */}
+          <div className="space-y-1">
+            <label className={labelCls}>Employment Type</label>
+            <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} className={inputCls}>
+              <option value="any">Any</option>
+              <option value="full_time">Full Time</option>
+              <option value="part_time">Part Time</option>
+            </select>
+          </div>
+
+          {/* Date Posted — both */}
+          <div className="space-y-1">
+            <label className={labelCls}>Date Posted</label>
+            <select value={datePosted} onChange={e => setDatePosted(e.target.value)} className={inputCls}>
+              <option value="">Any time</option>
+              <option value="1">Last 24 hours</option>
+              <option value="3">Last 3 days</option>
+              <option value="7">Last week</option>
+              <option value="14">Last 2 weeks</option>
+            </select>
+          </div>
+
+          {/* Contract Type — Reed only */}
+          <div className={`space-y-1 transition-opacity ${reedDisabled ? 'opacity-40' : ''}`} title={reedTitle}>
+            <label className={labelCls}>Contract Type <ReedBadge /></label>
+            <select
+              value={contractType}
+              onChange={e => setContractType(e.target.value)}
+              disabled={reedDisabled}
+              className={inputCls}
+            >
+              <option value="any">Any</option>
+              <option value="permanent">Permanent</option>
+              <option value="contract">Contract</option>
+              <option value="temporary">Temporary</option>
+            </select>
+          </div>
+
+          {/* Sort By — Adzuna only */}
+          <div className={`space-y-1 transition-opacity ${adzunaDisabled ? 'opacity-40' : ''}`} title={adzunaTitle}>
+            <label className={labelCls}>Sort By <AdzunaBadge /></label>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              disabled={adzunaDisabled}
+              className={inputCls}
+            >
+              <option value="relevance">Relevance</option>
+              <option value="date">Date</option>
+              <option value="salary_desc">Salary (high to low)</option>
+              <option value="salary_asc">Salary (low to high)</option>
+            </select>
+          </div>
+
+          {/* Maximum Salary — Adzuna only */}
+          <div className={`space-y-1 transition-opacity ${adzunaDisabled ? 'opacity-40' : ''}`} title={adzunaTitle}>
+            <label className={labelCls}>Maximum Salary (£) <AdzunaBadge /></label>
+            <input
+              type="number"
+              min={0}
+              value={maxSalary}
+              onChange={e => setMaxSalary(e.target.value)}
+              placeholder="e.g. 80000"
+              disabled={adzunaDisabled}
+              className={inputCls}
+            />
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Search Jobs tab ──────────────────────────────────────────────────────────
 
 function SearchJobsTab({
   keywords, setKeywords, location, setLocation,
   source, setSource, onSearch, searching,
   results, error, importingId, onImport, success, inputCls,
+  minSalary, setMinSalary, maxSalary, setMaxSalary,
+  employmentType, setEmploymentType, contractType, setContractType,
+  datePosted, setDatePosted, sortBy, setSortBy, onClearFilters,
 }) {
   return (
     <div className="space-y-4">
@@ -342,7 +521,7 @@ function SearchJobsTab({
           value={keywords}
           onChange={e => setKeywords(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
-          placeholder="e.g. software engineer"
+          placeholder="Enter a job title"
           className={`${inputCls} col-span-2`}
         />
         <input
@@ -350,7 +529,7 @@ function SearchJobsTab({
           value={location}
           onChange={e => setLocation(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
-          placeholder="London"
+          placeholder="Enter a location"
           className={inputCls}
         />
       </div>
@@ -382,6 +561,19 @@ function SearchJobsTab({
           {searching ? <><Spinner size={13} /> Searching…</> : 'Search'}
         </button>
       </div>
+
+      {/* filters */}
+      <FiltersPanel
+        source={source}
+        inputCls={inputCls}
+        minSalary={minSalary}         setMinSalary={setMinSalary}
+        maxSalary={maxSalary}         setMaxSalary={setMaxSalary}
+        employmentType={employmentType} setEmploymentType={setEmploymentType}
+        contractType={contractType}   setContractType={setContractType}
+        datePosted={datePosted}       setDatePosted={setDatePosted}
+        sortBy={sortBy}               setSortBy={setSortBy}
+        onClear={onClearFilters}
+      />
 
       {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
       {success && (

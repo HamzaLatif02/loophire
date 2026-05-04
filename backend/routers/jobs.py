@@ -18,6 +18,12 @@ class JobSearchRequest(BaseModel):
     keywords: str
     location: str = "London"
     source: str = "both"  # "reed" | "adzuna" | "both"
+    min_salary: Optional[int] = None
+    max_salary: Optional[int] = None
+    employment_type: Optional[str] = None   # "full_time" | "part_time"
+    contract_type: Optional[str] = None     # "permanent" | "contract" | "temporary" (Reed only)
+    date_posted: Optional[str] = None       # days: "1" | "3" | "7" | "14"
+    sort_by: Optional[str] = None           # "relevance" | "date" | "salary_desc" | "salary_asc" (Adzuna only)
 
 
 class JobImportRequest(BaseModel):
@@ -34,9 +40,22 @@ def job_search(body: JobSearchRequest) -> List[dict]:
 
     results = []
     if body.source in ("reed", "both"):
-        results.extend(search_reed(kw, body.location))
+        results.extend(search_reed(
+            kw, body.location,
+            min_salary=body.min_salary,
+            employment_type=body.employment_type,
+            contract_type=body.contract_type,
+            date_posted=body.date_posted,
+        ))
     if body.source in ("adzuna", "both"):
-        results.extend(search_adzuna(kw, body.location))
+        results.extend(search_adzuna(
+            kw, body.location,
+            min_salary=body.min_salary,
+            max_salary=body.max_salary,
+            employment_type=body.employment_type,
+            date_posted=body.date_posted,
+            sort_by=body.sort_by,
+        ))
 
     if not results and body.source == "both":
         raise HTTPException(
