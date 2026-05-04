@@ -130,6 +130,10 @@ export default function ApplyPage() {
           </button>
         </div>
 
+        <p className="text-xs text-[var(--color-muted)]">
+          Tip: For LinkedIn, open the job listing in a new tab (click the job title → open in new tab) and paste that URL. Search page URLs also work if they contain a job ID.
+        </p>
+
         {importError && (
           <p className="text-xs text-[var(--color-danger)]">{importError}</p>
         )}

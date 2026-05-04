@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import anthropic
 import httpx
@@ -37,20 +37,50 @@ _EXTRACT_SYSTEM = (
 )
 
 _EXTRACT_TEMPLATE = """\
-Extract the job listing details from the text below.
+Extract the job details from this page content.
+
+LinkedIn job pages typically show the job title near the top, the company name \
+below it, then an "About the job" or description section further down.
+Other job boards follow similar patterns — title, company, then full description.
 
 Return ONLY a JSON object with exactly these fields:
 {{
-  "job_title": "<job title string>",
-  "company_name": "<company name string>",
-  "job_description": "<the full job description text, cleaned of navigation menus, cookie banners, and boilerplate>"
+  "job_title": "exact job title",
+  "company_name": "exact company name",
+  "job_description": "the complete job description text including all responsibilities, \
+requirements, and qualifications — minimum 100 words"
 }}
 
-If any field cannot be determined, use an empty string.
+Rules:
+- job_description must include the full text: responsibilities, requirements, qualifications, \
+nice-to-haves. Do not summarise.
+- Strip navigation menus, cookie banners, "Apply now" buttons, and unrelated boilerplate.
+- If job_description is missing or under 50 words, set it to an empty string "" so the \
+caller can detect the failure.
+- If job_title or company_name cannot be determined, use an empty string.
 
 --- PAGE TEXT ---
 {text}
 """
+
+
+def normalise_job_url(url: str) -> str:
+    """Convert job board search/redirect URLs to canonical direct-listing URLs."""
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query)
+
+    # LinkedIn search page with currentJobId → direct view URL
+    if "linkedin.com/jobs/search" in url:
+        job_id = params.get("currentJobId", [None])[0]
+        if job_id:
+            return f"https://www.linkedin.com/jobs/view/{job_id}/"
+
+    # Indeed search/redirect with jk param → canonical viewjob URL
+    if "indeed.com" in url and "jk" in params:
+        job_id = params["jk"][0]
+        return f"https://www.indeed.com/viewjob?jk={job_id}"
+
+    return url
 
 
 def _validate_url(url: str) -> None:
@@ -160,11 +190,17 @@ def _call_claude(text: str) -> dict:
         logger.error(f"job_scraper: JSON parse failed: {exc} | raw: {raw[:300]}")
         raise RuntimeError("Could not parse the job listing — please paste the job description manually.")
 
-    return {
+    extracted = {
         "job_title": result.get("job_title", ""),
         "company_name": result.get("company_name", ""),
         "job_description": result.get("job_description", ""),
     }
+    if not extracted["job_description"]:
+        raise RuntimeError(
+            "Could not extract a job description from this page — "
+            "please paste the job description manually."
+        )
+    return extracted
 
 
 async def scrape_job(url: str) -> dict:
@@ -177,6 +213,8 @@ async def scrape_job(url: str) -> dict:
     """
     logger.info(f"job_scraper: scraping URL: {url}")
     _validate_url(url)
+    url = normalise_job_url(url)
+    logger.info(f"job_scraper: normalised URL: {url}")
 
     text = ""
 
