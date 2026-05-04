@@ -336,14 +336,14 @@ function SearchJobsTab({
   return (
     <div className="space-y-4">
       {/* inputs */}
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <input
           type="text"
           value={keywords}
           onChange={e => setKeywords(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
           placeholder="e.g. software engineer"
-          className={`${inputCls} flex-1`}
+          className={`${inputCls} col-span-2`}
         />
         <input
           type="text"
@@ -351,7 +351,7 @@ function SearchJobsTab({
           onChange={e => setLocation(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
           placeholder="London"
-          className={`${inputCls} w-32`}
+          className={inputCls}
         />
       </div>
 
@@ -431,15 +431,26 @@ function JobCard({ job, importing, onImport }) {
           </p>
         )}
       </div>
-      <button
-        type="button"
-        onClick={() => onImport(job)}
-        disabled={importing}
-        className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-md border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        {importing ? <Spinner size={11} /> : null}
-        Import
-      </button>
+      <div className="shrink-0 flex flex-col gap-1.5">
+        <button
+          type="button"
+          onClick={() => onImport(job)}
+          disabled={importing}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {importing ? <Spinner size={11} /> : null}
+          Import
+        </button>
+        {job.url && (
+          <button
+            type="button"
+            onClick={() => window.open(job.url, '_blank', 'noopener,noreferrer')}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+          >
+            Go to Job ↗
+          </button>
+        )}
+      </div>
     </li>
   )
 }
