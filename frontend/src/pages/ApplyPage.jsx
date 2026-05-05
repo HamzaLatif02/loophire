@@ -82,7 +82,7 @@ export default function ApplyPage() {
 
   // ── search jobs state ───────────────────────────────────────────────────────
   const [keywords, setKeywords]         = useState('')
-  const [location, setLocation]         = useState('London')
+  const [location, setLocation]         = useState('')
   const [source, setSource]             = useState('both')
   const [searching, setSearching]       = useState(false)
   const [results, setResults]           = useState([])
@@ -116,7 +116,7 @@ export default function ApplyPage() {
     try {
       const payload = {
         keywords: keywords.trim(),
-        location: location.trim() || 'London',
+        location: location.trim(),
         source,
       }
       if (minSalary)                   payload.min_salary = parseInt(minSalary, 10)
