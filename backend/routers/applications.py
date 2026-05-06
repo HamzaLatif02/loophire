@@ -19,6 +19,7 @@ from services.memory_service import get_preferences
 from services.pdf_export_service import generate_pdf
 from services.research_service import research_company
 from models.application import Application, ApplicationStatus
+from models.cv_version import CVVersion
 from models.user import User
 
 logger = logging.getLogger(__name__)
@@ -73,14 +74,39 @@ async def scrape_job_endpoint(url: str = Body(..., embed=True)):
 def generate_application(body: ApplicationGenerateRequest, db: Session = Depends(get_db)):
     user = _get_user(body.user_id, db)
 
-    if not user.base_cv_text:
+    # Resolve which CV text to use
+    cv_text: str | None = None
+    cv_links: list = []
+
+    if body.cv_version_id:
+        cv_ver = (
+            db.query(CVVersion)
+            .filter(CVVersion.id == body.cv_version_id, CVVersion.user_id == body.user_id)
+            .first()
+        )
+        if not cv_ver:
+            raise HTTPException(status_code=404, detail="CV version not found.")
+        cv_text = cv_ver.cv_text
+    else:
+        default_ver = (
+            db.query(CVVersion)
+            .filter(CVVersion.user_id == body.user_id, CVVersion.is_default == True)  # noqa: E712
+            .first()
+        )
+        if default_ver:
+            cv_text = default_ver.cv_text
+        else:
+            cv_text = user.base_cv_text
+            cv_links = user.cv_links or []
+
+    if not cv_text:
         raise HTTPException(
             status_code=400,
             detail="No CV on file. Upload a CV before generating an application.",
         )
 
     try:
-        fit_analysis = analyse_fit(user.base_cv_text, body.job_description)
+        fit_analysis = analyse_fit(cv_text, body.job_description)
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"Fit analysis failed: {exc}")
 
@@ -93,12 +119,12 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
 
     try:
         written = write_application(
-            cv_text=user.base_cv_text,
+            cv_text=cv_text,
             job_description=body.job_description,
             fit_analysis=fit_analysis,
             company_research=company_research,
             user_preferences=user_preferences or None,
-            cv_links=user.cv_links or [],
+            cv_links=cv_links,
         )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"Document generation failed: {exc}")

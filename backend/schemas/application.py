@@ -14,6 +14,7 @@ class ApplicationGenerateRequest(BaseModel):
     job_title: str
     company_name: str
     job_description: str
+    cv_version_id: Optional[int] = None
 
 
 class ApplicationSummary(BaseModel):

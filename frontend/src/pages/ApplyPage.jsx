@@ -35,6 +35,20 @@ export default function ApplyPage() {
   const [genStep, setGenStep] = useState(0)
   const [formError, setFormError] = useState('')
 
+  // ── CV versions ─────────────────────────────────────────────────────────────
+  const [cvVersions, setCvVersions]       = useState([])
+  const [selectedCvId, setSelectedCvId]   = useState(null) // null = use default
+
+  useEffect(() => {
+    api.get(`/cvs?user_id=${USER_ID}`)
+      .then(res => {
+        setCvVersions(res.data)
+        const def = res.data.find(v => v.is_default)
+        if (def) setSelectedCvId(def.id)
+      })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     if (loading) {
       setGenStep(0)
@@ -69,7 +83,9 @@ export default function ApplyPage() {
     setLoading(true)
     setFormError('')
     try {
-      const res = await api.post('/applications/generate', { ...form, user_id: USER_ID })
+      const payload = { ...form, user_id: USER_ID }
+      if (selectedCvId) payload.cv_version_id = selectedCvId
+      const res = await api.post('/applications/generate', payload)
       navigate(`/applications/${res.data.id}`)
     } catch (err) {
       setFormError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Generation failed — please try again.')
@@ -307,6 +323,31 @@ export default function ApplyPage() {
         onSubmit={generate}
         className={`space-y-5 transition-opacity duration-200 ${loading ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}
       >
+        {/* CV selector */}
+        {cvVersions.length > 0 && (
+          <Field label="CV Version">
+            <select
+              value={selectedCvId ?? ''}
+              onChange={e => setSelectedCvId(e.target.value ? Number(e.target.value) : null)}
+              disabled={loading}
+              className={inputCls}
+            >
+              {cvVersions.map(cv => (
+                <option key={cv.id} value={cv.id}>
+                  {cv.name}{cv.is_default ? ' (default)' : ''}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {cvVersions.length === 0 && (
+          <p className="text-xs text-[var(--color-muted)]">
+            No CV versions found —{' '}
+            <a href="/cv-manager" className="text-[var(--color-accent)] hover:underline">upload one in CV Manager</a>
+            {' '}before generating.
+          </p>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Job Title">
             <input

@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const links = [
   { to: '/apply',        label: 'New Application' },
   { to: '/applications', label: 'Dashboard' },
+  { to: '/cv-manager',   label: 'CV Manager' },
 ]
 
 export default function Navbar() {

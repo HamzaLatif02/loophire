@@ -17,3 +17,4 @@ class User(Base):
 
     applications = relationship("Application", back_populates="user", cascade="all, delete-orphan")
     memories = relationship("AgentMemory", back_populates="user", cascade="all, delete-orphan")
+    cv_versions = relationship("CVVersion", back_populates="user", cascade="all, delete-orphan")

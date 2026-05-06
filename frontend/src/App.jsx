@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage'
 import ApplyPage from './pages/ApplyPage'
 import DashboardPage from './pages/DashboardPage'
 import ApplicationDetailPage from './pages/ApplicationDetailPage'
+import CVManagerPage from './pages/CVManagerPage'
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Route path="/apply" element={<ApplyPage />} />
         <Route path="/applications" element={<DashboardPage />} />
         <Route path="/applications/:id" element={<ApplicationDetailPage />} />
+        <Route path="/cv-manager" element={<CVManagerPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -10,6 +10,7 @@ from database import SessionLocal
 from models.user import User
 from routers import applications as applications_router
 from routers import cv as cv_router
+from routers import cvs as cvs_router
 from routers import jobs as jobs_router
 
 logging.basicConfig(
@@ -42,6 +43,7 @@ def root():
     return {"status": "ok"}
 
 app.include_router(cv_router.router, prefix="/api/cv")
+app.include_router(cvs_router.router)
 app.include_router(applications_router.router)
 app.include_router(jobs_router.router)
 
