@@ -7,6 +7,8 @@ from typing import List, Optional
 import anthropic
 from dotenv import load_dotenv
 
+from agents.tone_agent import analyse_tone
+
 load_dotenv()
 
 logger = logging.getLogger("loophire.agents.writer")
@@ -73,6 +75,25 @@ def _build_preference_block(preferences: Optional[dict]) -> str:
 def _build_system(base: str, preferences: Optional[dict]) -> str:
     pref_block = _build_preference_block(preferences)
     return f"{base}\n\n{pref_block}" if pref_block else base
+
+
+def _build_tone_block(tone_analysis: Optional[dict]) -> str:
+    if not tone_analysis:
+        return ""
+    tone  = tone_analysis.get("tone", "")
+    style = tone_analysis.get("writing_style", "")
+    use   = ", ".join(tone_analysis.get("vocabulary_to_use", []))
+    avoid = ", ".join(tone_analysis.get("vocabulary_to_avoid", []))
+    lines = [f"\nTONE GUIDANCE (detected from job description):"]
+    if tone:
+        lines.append(f"  Tone: {tone}.")
+    if style:
+        lines.append(f"  Style: {style}.")
+    if use:
+        lines.append(f"  Vocabulary that fits this tone: {use}.")
+    if avoid:
+        lines.append(f"  Vocabulary that does NOT fit — avoid these: {avoid}.")
+    return "\n".join(lines)
 
 
 def _format_fit_summary(fit_analysis: dict) -> str:
@@ -213,12 +234,21 @@ def write_application(
     user_preferences: Optional[dict] = None,
     cv_links: Optional[List[dict]] = None,
 ) -> dict:
-    """Rewrite a CV as structured JSON and draft a plain-text cover letter."""
+    """Rewrite a CV as structured JSON and draft a tone-matched cover letter."""
     fit_summary = _format_fit_summary(fit_analysis)
     company_context = _format_company_context(company_research)
     links_context = _format_links_context(cv_links)
     cv_system = _build_system(_CV_SYSTEM_BASE, user_preferences)
-    cover_system = _build_system(_COVER_LETTER_SYSTEM_BASE, user_preferences)
+
+    # Detect JD tone — non-fatal if it fails
+    tone_analysis: Optional[dict] = None
+    try:
+        tone_analysis = analyse_tone(job_description)
+    except Exception as exc:
+        logger.warning("write_application: tone analysis failed (non-fatal): %s", exc)
+
+    tone_block = _build_tone_block(tone_analysis)
+    cover_system = _build_system(_COVER_LETTER_SYSTEM_BASE + tone_block, user_preferences)
 
     cv_prompt = f"""\
 Rewrite the CV below to better match the job description and return it as a JSON object.
@@ -316,4 +346,5 @@ RULES:
         "tailored_cv": tailored_cv_text,
         "tailored_cv_json": tailored_cv_json,
         "cover_letter": cover_letter,
+        "tone_analysis": tone_analysis,
     }

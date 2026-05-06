@@ -52,6 +52,7 @@ class ApplicationDetail(BaseModel):
     response_date: Optional[datetime] = None
     response_type: Optional[str] = None
     interview_prep: Optional[Dict[str, Any]] = None
+    tone_analysis: Optional[Dict[str, Any]] = None
     created_at: datetime
 
     class Config:

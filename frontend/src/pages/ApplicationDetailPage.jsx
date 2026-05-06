@@ -460,6 +460,86 @@ function ScoreCircle({ score, color }) {
 
 // ─── analysis panel ───────────────────────────────────────────────────────────
 
+const TONE_STYLES = {
+  'formal':          { badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',   label: 'Formal' },
+  'startup-casual':  { badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', label: 'Startup-casual' },
+  'technical':       { badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20',    label: 'Technical' },
+  'corporate':       { badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',       label: 'Corporate' },
+}
+
+function ToneAnalysisSection({ tone_analysis }) {
+  if (!tone_analysis) return null
+  const { tone, tone_signals = [], writing_style, vocabulary_to_use = [], vocabulary_to_avoid = [] } = tone_analysis
+  const style = TONE_STYLES[tone] ?? TONE_STYLES['formal']
+
+  return (
+    <SectionCard title="Tone Analysis">
+      <div className="space-y-4">
+
+        {/* badge */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--color-muted)]">Detected tone:</span>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border capitalize ${style.badge}`}>
+            {style.label}
+          </span>
+        </div>
+
+        {/* writing style guidance */}
+        {writing_style && (
+          <div>
+            <p className="text-xs font-medium text-[var(--color-muted)] mb-1">Writing guidance</p>
+            <p className="text-sm text-[var(--color-text)] leading-relaxed">{writing_style}</p>
+          </div>
+        )}
+
+        {/* tone signals */}
+        {tone_signals.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-[var(--color-muted)] mb-2">Tone signals from JD</p>
+            <ul className="space-y-1">
+              {tone_signals.map((phrase, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-[var(--color-muted)]">
+                  <span className="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]" />
+                  <span className="italic">&ldquo;{phrase}&rdquo;</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* vocabulary */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {vocabulary_to_use.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-[var(--color-muted)] mb-2">Use these words</p>
+              <div className="flex flex-wrap gap-1.5">
+                {vocabulary_to_use.map((w, i) => (
+                  <span key={i} className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {vocabulary_to_avoid.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-[var(--color-muted)] mb-2">Avoid these words</p>
+              <div className="flex flex-wrap gap-1.5">
+                {vocabulary_to_avoid.map((w, i) => (
+                  <span key={i} className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--color-danger)]/10 text-[var(--color-danger)] border border-[var(--color-danger)]/20">
+                    {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </SectionCard>
+  )
+}
+
 function AnalysisPanel({ app, score, color, fitLabel }) {
   const research = app.company_research
   const gaps     = app.keyword_gaps ?? []
@@ -490,6 +570,9 @@ function AnalysisPanel({ app, score, color, fitLabel }) {
           </div>
         </div>
       </SectionCard>
+
+      {/* tone analysis */}
+      <ToneAnalysisSection tone_analysis={app.tone_analysis} />
 
       {/* keyword gaps */}
       <SectionCard title="Keyword Gaps">

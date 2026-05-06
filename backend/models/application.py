@@ -47,5 +47,6 @@ class Application(Base):
     response_date = Column(DateTime(timezone=True), nullable=True)
     response_type = Column(String, nullable=True)
     interview_prep = Column(JSON, nullable=True)
+    tone_analysis = Column(JSON, nullable=True)
 
     user = relationship("User", back_populates="applications")

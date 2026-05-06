@@ -140,6 +140,7 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
         tailored_cv=written["tailored_cv"],
         tailored_cv_json=written["tailored_cv_json"],
         cover_letter=written["cover_letter"],
+        tone_analysis=written.get("tone_analysis"),
         status=ApplicationStatus.draft,
     )
     db.add(application)
