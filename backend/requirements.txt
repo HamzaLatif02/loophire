@@ -16,3 +16,4 @@ curl-cffi
 passlib[bcrypt]
 python-jose[cryptography]
 slowapi
+pydantic[email]
