@@ -1,21 +1,29 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import HomePage from './pages/HomePage'
-import ApplyPage from './pages/ApplyPage'
-import DashboardPage from './pages/DashboardPage'
+import PrivateRoute from './components/PrivateRoute'
 import ApplicationDetailPage from './pages/ApplicationDetailPage'
+import ApplyPage from './pages/ApplyPage'
 import CVManagerPage from './pages/CVManagerPage'
+import DashboardPage from './pages/DashboardPage'
+import HomePage from './pages/HomePage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 
 export default function App() {
   return (
     <Routes>
+      {/* public auth routes — no layout wrapper */}
+      <Route path="/login"    element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+
+      {/* protected routes — wrapped in layout */}
       <Route element={<Layout />}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/apply" element={<ApplyPage />} />
-        <Route path="/applications" element={<DashboardPage />} />
-        <Route path="/applications/:id" element={<ApplicationDetailPage />} />
-        <Route path="/cv-manager" element={<CVManagerPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/"               element={<PrivateRoute><HomePage /></PrivateRoute>} />
+        <Route path="/apply"          element={<PrivateRoute><ApplyPage /></PrivateRoute>} />
+        <Route path="/applications"   element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+        <Route path="/applications/:id" element={<PrivateRoute><ApplicationDetailPage /></PrivateRoute>} />
+        <Route path="/cv-manager"     element={<PrivateRoute><CVManagerPage /></PrivateRoute>} />
+        <Route path="*"               element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   )

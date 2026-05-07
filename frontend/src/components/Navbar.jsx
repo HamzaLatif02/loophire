@@ -1,4 +1,7 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { isLoggedIn, removeToken } from '../utils/auth'
+import api from '../utils/api'
+import { useEffect, useState } from 'react'
 
 const links = [
   { to: '/apply',        label: 'New Application' },
@@ -7,6 +10,20 @@ const links = [
 ]
 
 export default function Navbar() {
+  const navigate   = useNavigate()
+  const loggedIn   = isLoggedIn()
+  const [email, setEmail] = useState('')
+
+  useEffect(() => {
+    if (!loggedIn) return
+    api.get('/auth/me').then(r => setEmail(r.data.email)).catch(() => {})
+  }, [loggedIn])
+
+  function handleLogout() {
+    removeToken()
+    navigate('/login')
+  }
+
   return (
     <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -20,23 +37,56 @@ export default function Navbar() {
           </span>
         </NavLink>
 
-        <nav className="flex items-center gap-1">
-          {links.map(({ to, label }) => (
+        {loggedIn ? (
+          <div className="flex items-center gap-1">
+            <nav className="flex items-center gap-1">
+              {links.map(({ to, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-[var(--color-surface-2)] text-[var(--color-accent)]'
+                        : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
+                    }`
+                  }
+                >
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-2 ml-3 pl-3 border-l border-[var(--color-border)]">
+              {email && (
+                <span className="text-xs text-[var(--color-muted)] hidden sm:block truncate max-w-[160px]">
+                  {email}
+                </span>
+              )}
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/5 transition-colors"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        ) : (
+          <nav className="flex items-center gap-2">
             <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-[var(--color-surface-2)] text-[var(--color-accent)]'
-                    : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
-                }`
-              }
+              to="/login"
+              className="px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
             >
-              {label}
+              Log in
             </NavLink>
-          ))}
-        </nav>
+            <NavLink
+              to="/register"
+              className="px-3 py-1.5 rounded-md text-sm font-medium bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-2)] transition-colors"
+            >
+              Sign up
+            </NavLink>
+          </nav>
+        )}
       </div>
     </header>
   )

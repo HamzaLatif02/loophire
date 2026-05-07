@@ -13,3 +13,6 @@ reportlab
 lxml
 readability-lxml
 curl-cffi
+passlib[bcrypt]
+python-jose[cryptography]
+slowapi

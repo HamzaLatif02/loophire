@@ -13,6 +13,7 @@ from agents.fit_agent import analyse_fit
 from agents.interview_agent import generate_interview_prep
 from agents.writer_agent import write_application
 from database import get_db
+from dependencies.auth_dependency import get_current_user
 from services.job_scraper_service import scrape_job
 from services.latex_export_service import generate_cv_pdf
 from services.memory_service import get_preferences
@@ -21,8 +22,6 @@ from services.research_service import research_company
 from models.application import Application, ApplicationStatus
 from models.cv_version import CVVersion
 from models.user import User
-
-logger = logging.getLogger(__name__)
 from schemas.application import (
     AnalyticsResponse,
     ApplicationDetail,
@@ -34,14 +33,9 @@ from schemas.application import (
     ResponseUpdateRequest,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/applications", tags=["applications"])
-
-
-def _get_user(user_id: int, db: Session) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
 
 
 def _get_application(application_id: int, user_id: int, db: Session) -> Application:
@@ -56,7 +50,10 @@ def _get_application(application_id: int, user_id: int, db: Session) -> Applicat
 
 
 @router.post("/scrape-job")
-async def scrape_job_endpoint(url: str = Body(..., embed=True)):
+async def scrape_job_endpoint(
+    url: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+):
     try:
         return await asyncio.wait_for(scrape_job(url), timeout=25.0)
     except asyncio.TimeoutError:
@@ -71,9 +68,11 @@ async def scrape_job_endpoint(url: str = Body(..., embed=True)):
 
 
 @router.post("/generate", response_model=ApplicationDetail, status_code=201)
-def generate_application(body: ApplicationGenerateRequest, db: Session = Depends(get_db)):
-    user = _get_user(body.user_id, db)
-
+def generate_application(
+    body: ApplicationGenerateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     # Resolve which CV text to use
     cv_text: str | None = None
     cv_links: list = []
@@ -81,7 +80,7 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
     if body.cv_version_id:
         cv_ver = (
             db.query(CVVersion)
-            .filter(CVVersion.id == body.cv_version_id, CVVersion.user_id == body.user_id)
+            .filter(CVVersion.id == body.cv_version_id, CVVersion.user_id == current_user.id)
             .first()
         )
         if not cv_ver:
@@ -90,14 +89,14 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
     else:
         default_ver = (
             db.query(CVVersion)
-            .filter(CVVersion.user_id == body.user_id, CVVersion.is_default == True)  # noqa: E712
+            .filter(CVVersion.user_id == current_user.id, CVVersion.is_default == True)  # noqa: E712
             .first()
         )
         if default_ver:
             cv_text = default_ver.cv_text
         else:
-            cv_text = user.base_cv_text
-            cv_links = user.cv_links or []
+            cv_text = current_user.base_cv_text
+            cv_links = current_user.cv_links or []
 
     if not cv_text:
         raise HTTPException(
@@ -115,7 +114,7 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
     except (RuntimeError, ValueError):
         company_research = None
 
-    user_preferences = get_preferences(body.user_id)
+    user_preferences = get_preferences(current_user.id)
 
     try:
         written = write_application(
@@ -130,7 +129,7 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
         raise HTTPException(status_code=502, detail=f"Document generation failed: {exc}")
 
     application = Application(
-        user_id=user.id,
+        user_id=current_user.id,
         job_title=body.job_title,
         company_name=body.company_name,
         job_description=body.job_description,
@@ -151,24 +150,28 @@ def generate_application(body: ApplicationGenerateRequest, db: Session = Depends
 
 
 @router.get("", response_model=List[ApplicationSummary])
-def list_applications(user_id: int, db: Session = Depends(get_db)):
-    # No user existence check — returns [] naturally when no records exist,
-    # so the frontend receives an empty array instead of a 404.
+def list_applications(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     return (
         db.query(Application)
-        .filter(Application.user_id == user_id)
+        .filter(Application.user_id == current_user.id)
         .order_by(Application.created_at.desc())
         .all()
     )
 
 
 @router.get("/upcoming-interviews", response_model=List[ApplicationSummary])
-def get_upcoming_interviews(user_id: int = Query(...), db: Session = Depends(get_db)):
+def get_upcoming_interviews(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     now = datetime.now(timezone.utc)
     return (
         db.query(Application)
         .filter(
-            Application.user_id == user_id,
+            Application.user_id == current_user.id,
             Application.interview_date.isnot(None),
             Application.interview_date > now,
         )
@@ -178,8 +181,11 @@ def get_upcoming_interviews(user_id: int = Query(...), db: Session = Depends(get
 
 
 @router.get("/analytics", response_model=AnalyticsResponse)
-def get_analytics(user_id: int = Query(...), db: Session = Depends(get_db)):
-    apps = db.query(Application).filter(Application.user_id == user_id).all()
+def get_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    apps = db.query(Application).filter(Application.user_id == current_user.id).all()
     total = len(apps)
     if total == 0:
         return AnalyticsResponse(
@@ -229,9 +235,12 @@ def get_analytics(user_id: int = Query(...), db: Session = Depends(get_db)):
 
 
 @router.get("/{application_id}", response_model=ApplicationDetail)
-def get_application(application_id: int, user_id: int, db: Session = Depends(get_db)):
-    _get_user(user_id, db)
-    return _get_application(application_id, user_id, db)
+def get_application(
+    application_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return _get_application(application_id, current_user.id, db)
 
 
 def _flatten_cv_json(cv_json: dict) -> str:
@@ -254,11 +263,10 @@ def _flatten_cv_json(cv_json: dict) -> str:
 def patch_application(
     application_id: int,
     body: ApplicationPatchRequest,
-    user_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_user(user_id, db)
-    application = _get_application(application_id, user_id, db)
+    application = _get_application(application_id, current_user.id, db)
     if body.tailored_cv_json is not None:
         application.tailored_cv_json = body.tailored_cv_json
         application.tailored_cv = _flatten_cv_json(body.tailored_cv_json)
@@ -273,11 +281,10 @@ def patch_application(
 def update_status(
     application_id: int,
     body: ApplicationStatusUpdate,
-    user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_user(user_id, db)
-    application = _get_application(application_id, user_id, db)
+    application = _get_application(application_id, current_user.id, db)
     application.status = body.status
     db.commit()
     db.refresh(application)
@@ -288,11 +295,10 @@ def update_status(
 def update_interview(
     application_id: int,
     body: InterviewUpdateRequest,
-    user_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_user(user_id, db)
-    application = _get_application(application_id, user_id, db)
+    application = _get_application(application_id, current_user.id, db)
     if body.interview_date is not None:
         application.interview_date = body.interview_date
     if body.interview_notes is not None:
@@ -306,11 +312,10 @@ def update_interview(
 def update_response(
     application_id: int,
     body: ResponseUpdateRequest,
-    user_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_user(user_id, db)
-    application = _get_application(application_id, user_id, db)
+    application = _get_application(application_id, current_user.id, db)
     application.got_response = body.got_response
     application.response_type = body.response_type if body.got_response else None
     if body.got_response and application.response_date is None:
@@ -325,16 +330,15 @@ def update_response(
 @router.post("/{application_id}/interview-prep", response_model=ApplicationDetail)
 def create_interview_prep(
     application_id: int,
-    user_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = _get_user(user_id, db)
-    application = _get_application(application_id, user_id, db)
+    application = _get_application(application_id, current_user.id, db)
 
     if not application.job_description:
         raise HTTPException(status_code=400, detail="No job description on this application.")
 
-    cv_text = user.base_cv_text or application.tailored_cv or ""
+    cv_text = current_user.base_cv_text or application.tailored_cv or ""
     if not cv_text:
         raise HTTPException(status_code=400, detail="No CV text available — upload a CV first.")
 
@@ -350,18 +354,16 @@ def create_interview_prep(
 
 
 def _safe_filename(text: str) -> str:
-    """Strip non-alphanumeric characters so filenames are safe across OS."""
     return re.sub(r"[^\w]+", "_", text).strip("_").lower()
 
 
 @router.get("/{application_id}/export/cv")
 def export_cv(
     application_id: int,
-    user_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_user(user_id, db)
-    app = _get_application(application_id, user_id, db)
+    app = _get_application(application_id, current_user.id, db)
     if not app.tailored_cv_json:
         raise HTTPException(status_code=404, detail="No tailored CV available for this application.")
     try:
@@ -383,11 +385,10 @@ def export_cv(
 @router.get("/{application_id}/export/cover-letter")
 def export_cover_letter(
     application_id: int,
-    user_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_user(user_id, db)
-    app = _get_application(application_id, user_id, db)
+    app = _get_application(application_id, current_user.id, db)
     if not app.cover_letter:
         raise HTTPException(status_code=404, detail="No cover letter available for this application.")
     pdf = generate_pdf(

@@ -10,7 +10,6 @@ RESPONSE_TYPES = ["recruiter screen", "technical interview", "rejection", "offer
 
 
 class ApplicationGenerateRequest(BaseModel):
-    user_id: int
     job_title: str
     company_name: str
     job_description: str

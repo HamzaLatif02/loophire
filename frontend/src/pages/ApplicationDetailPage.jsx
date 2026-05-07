@@ -6,7 +6,6 @@ import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
 import api from '../utils/api'
 
-const USER_ID = 1 // placeholder until auth is implemented
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
@@ -80,7 +79,7 @@ export default function ApplicationDetailPage() {
   const dropdownRef = useRef(null)
 
   useEffect(() => {
-    api.get(`/applications/${id}?user_id=${USER_ID}`)
+    api.get(`/applications/${id}`)
       .then((r) => setApp(r.data))
       .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Application not found.'))
       .finally(() => setLoading(false))
@@ -107,7 +106,7 @@ export default function ApplicationDetailPage() {
   }, [])
 
   async function patchApplication(fields) {
-    const r = await api.patch(`/applications/${id}?user_id=${USER_ID}`, fields)
+    const r = await api.patch(`/applications/${id}`, fields)
     setApp(r.data)
   }
 
@@ -115,7 +114,7 @@ export default function ApplicationDetailPage() {
     if (savingInterview) return
     setSavingInterview(true)
     try {
-      const r = await api.patch(`/applications/${id}/interview?user_id=${USER_ID}`, {
+      const r = await api.patch(`/applications/${id}/interview`, {
         interview_date: interviewDate || null,
         interview_notes: interviewNotes || null,
       })
@@ -131,7 +130,7 @@ export default function ApplicationDetailPage() {
     if (savingResponse) return
     setSavingResponse(true)
     try {
-      const r = await api.patch(`/applications/${id}/response?user_id=${USER_ID}`, {
+      const r = await api.patch(`/applications/${id}/response`, {
         got_response: newGotResponse,
         response_type: newGotResponse ? (newResponseType || null) : null,
       })
@@ -148,7 +147,7 @@ export default function ApplicationDetailPage() {
     setGeneratingPrep(true)
     setPrepError('')
     try {
-      const r = await api.post(`/applications/${id}/interview-prep?user_id=${USER_ID}`)
+      const r = await api.post(`/applications/${id}/interview-prep`)
       setApp(r.data)
     } catch (err) {
       setPrepError(err.response?.data?.detail ?? 'Failed to generate interview questions.')
@@ -162,7 +161,7 @@ export default function ApplicationDetailPage() {
     setSaving(true)
     setStatusOpen(false)
     try {
-      const r = await api.patch(`/applications/${id}/status?user_id=${USER_ID}`, { status })
+      const r = await api.patch(`/applications/${id}/status`, { status })
       setApp(r.data)
     } catch { /* non-critical */ } finally {
       setSaving(false)
@@ -395,7 +394,7 @@ export default function ApplicationDetailPage() {
           <CVEditor
             value={app.tailored_cv_json}
             onSave={(updatedJson) => patchApplication({ tailored_cv_json: updatedJson })}
-            exportUrl={`/api/applications/${id}/export/cv?user_id=${USER_ID}`}
+            exportUrl={`/api/applications/${id}/export/cv`}
             exportFilename={`tailored_cv_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
           />
         )}
@@ -403,7 +402,7 @@ export default function ApplicationDetailPage() {
           <EditableTextArea
             value={app.cover_letter}
             onSave={(text) => patchApplication({ cover_letter: text })}
-            exportUrl={`/api/applications/${id}/export/cover-letter?user_id=${USER_ID}`}
+            exportUrl={`/api/applications/${id}/export/cover-letter`}
             exportFilename={`cover_letter_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
             emptyMsg="No cover letter was generated for this application."
           />

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import Spinner from '../components/Spinner'
 import api from '../utils/api'
 
-const USER_ID = 1
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-GB', {
@@ -30,7 +29,7 @@ export default function CVManagerPage() {
 
   async function fetchVersions() {
     try {
-      const res = await api.get(`/cvs?user_id=${USER_ID}`)
+      const res = await api.get('/cvs')
       setVersions(res.data)
     } catch {
       setError('Failed to load CV versions.')
@@ -54,7 +53,7 @@ export default function CVManagerPage() {
     form.append('file', file)
 
     try {
-      await api.post(`/cvs/upload?user_id=${USER_ID}&name=${encodeURIComponent(name.trim())}`, form, {
+      await api.post(`/cvs/upload?name=${encodeURIComponent(name.trim())}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       setUploadSuccess(`"${name.trim()}" uploaded successfully.`)
@@ -71,7 +70,7 @@ export default function CVManagerPage() {
 
   async function handleSetDefault(id) {
     try {
-      await api.patch(`/cvs/${id}/set-default?user_id=${USER_ID}`)
+      await api.patch(`/cvs/${id}/set-default`)
       await fetchVersions()
     } catch {
       setError('Failed to set default.')
@@ -81,7 +80,7 @@ export default function CVManagerPage() {
   async function handleDelete(id, name) {
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
     try {
-      await api.delete(`/cvs/${id}?user_id=${USER_ID}`)
+      await api.delete(`/cvs/${id}`)
       await fetchVersions()
     } catch {
       setError('Failed to delete CV version.')

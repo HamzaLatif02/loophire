@@ -449,7 +449,10 @@ export default function CVEditor({ value, onSave, exportUrl, exportFilename }) {
     setExporting(true)
     try {
       const base = import.meta.env.VITE_API_URL ?? ''
-      const res = await fetch(`${base}${exportUrl}`)
+      const token = localStorage.getItem('loophire_token')
+      const res = await fetch(`${base}${exportUrl}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
       if (!res.ok) throw new Error()
       const blob = await res.blob()
       const link = document.createElement('a')

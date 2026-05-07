@@ -16,7 +16,6 @@ import {
 } from 'recharts'
 import api from '../utils/api'
 
-const USER_ID = 1 // placeholder until auth is implemented
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -52,14 +51,14 @@ export default function DashboardPage() {
   const [sortDir, setSortDir]           = useState('desc')
 
   useEffect(() => {
-    api.get(`/applications?user_id=${USER_ID}`)
+    api.get('/applications')
       .then((r) => setApps(r.data))
       .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Failed to load applications.'))
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    api.get(`/applications/analytics?user_id=${USER_ID}`)
+    api.get('/applications/analytics')
       .then((r) => setAnalytics(r.data))
       .catch(() => {})
   }, [])

@@ -4,7 +4,6 @@ import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
 import api from '../utils/api'
 
-const USER_ID = 1 // placeholder until auth is implemented
 
 const GEN_STEPS = [
   { icon: '🔍', text: 'Researching company…' },
@@ -40,7 +39,7 @@ export default function ApplyPage() {
   const [selectedCvId, setSelectedCvId]   = useState(null) // null = use default
 
   useEffect(() => {
-    api.get(`/cvs?user_id=${USER_ID}`)
+    api.get('/cvs')
       .then(res => {
         setCvVersions(res.data)
         const def = res.data.find(v => v.is_default)
@@ -83,7 +82,7 @@ export default function ApplyPage() {
     setLoading(true)
     setFormError('')
     try {
-      const payload = { ...form, user_id: USER_ID }
+      const payload = { ...form }
       if (selectedCvId) payload.cv_version_id = selectedCvId
       const res = await api.post('/applications/generate', payload)
       navigate(`/applications/${res.data.id}`)

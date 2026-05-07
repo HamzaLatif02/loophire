@@ -4,7 +4,6 @@ import ErrorBanner from '../components/ErrorBanner'
 import Spinner from '../components/Spinner'
 import api from '../utils/api'
 
-const USER_ID = 1 // placeholder until auth is implemented
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -45,7 +44,7 @@ export default function HomePage() {
     try {
       const form = new FormData()
       form.append('file', file)
-      const res = await api.post(`/cv/upload?user_id=${USER_ID}`, form, {
+      const res = await api.post('/cv/upload', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       const text = res.data.cv_text ?? ''
