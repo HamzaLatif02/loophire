@@ -1,13 +1,14 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies.auth_dependency import get_current_user
 from models.user import User
-from schemas.cv import CVUploadResponse, CVResponse
+from schemas.cv import CVResponse, CVUploadResponse
 from services.cv_parser import parse_pdf_with_links
+from utils.rate_limiter import LIMITS, limiter
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,9 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 @router.post("/upload", response_model=CVUploadResponse)
+@limiter.limit(LIMITS["cv_upload"])
 async def upload_cv(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -58,12 +61,18 @@ async def upload_cv(
 
 
 @router.get("", response_model=CVResponse)
+@limiter.limit(LIMITS["cv_list"])
 def get_cv(
+    request: Request,
     current_user: User = Depends(get_current_user),
 ):
     return CVResponse(user_id=current_user.id, cv_text=current_user.base_cv_text)
 
 
 @router.get("/debug-links")
-def debug_links(current_user: User = Depends(get_current_user)):
+@limiter.limit(LIMITS["cv_list"])
+def debug_links(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
     return {"user_id": current_user.id, "cv_links": current_user.cv_links or []}

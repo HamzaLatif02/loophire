@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from dependencies.auth_dependency import get_current_user
 from models.cv_version import CVVersion
 from models.user import User
 from services.cv_parser import parse_pdf_with_links
+from utils.rate_limiter import LIMITS, limiter
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,9 @@ def _to_out(cv: CVVersion) -> CVVersionOut:
 # ── endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[CVVersionOut])
+@limiter.limit(LIMITS["cv_list"])
 def list_cv_versions(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -66,7 +69,9 @@ def list_cv_versions(
 
 
 @router.post("/upload", response_model=CVVersionOut, status_code=201)
+@limiter.limit(LIMITS["cv_upload"])
 async def upload_cv_version(
+    request: Request,
     file: UploadFile = File(...),
     name: str = Query(..., min_length=1, max_length=100),
     current_user: User = Depends(get_current_user),
@@ -108,7 +113,9 @@ async def upload_cv_version(
 
 
 @router.patch("/{cv_id}/set-default", response_model=CVVersionOut)
+@limiter.limit(LIMITS["cv_list"])
 def set_default_cv(
+    request: Request,
     cv_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -124,7 +131,9 @@ def set_default_cv(
 
 
 @router.delete("/{cv_id}", status_code=204)
+@limiter.limit(LIMITS["cv_list"])
 def delete_cv_version(
+    request: Request,
     cv_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

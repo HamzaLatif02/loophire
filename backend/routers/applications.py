@@ -5,7 +5,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,7 @@ from schemas.application import (
     InterviewUpdateRequest,
     ResponseUpdateRequest,
 )
+from utils.rate_limiter import LIMITS, limiter
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,9 @@ def _get_application(application_id: int, user_id: int, db: Session) -> Applicat
 
 
 @router.post("/scrape-job")
+@limiter.limit(LIMITS["app_scrape_job"])
 async def scrape_job_endpoint(
+    request: Request,
     url: str = Body(..., embed=True),
     current_user: User = Depends(get_current_user),
 ):
@@ -68,12 +71,13 @@ async def scrape_job_endpoint(
 
 
 @router.post("/generate", response_model=ApplicationDetail, status_code=201)
+@limiter.limit(LIMITS["app_generate"])
 def generate_application(
+    request: Request,
     body: ApplicationGenerateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Resolve which CV text to use
     cv_text: str | None = None
     cv_links: list = []
 
@@ -150,7 +154,9 @@ def generate_application(
 
 
 @router.get("", response_model=List[ApplicationSummary])
+@limiter.limit(LIMITS["app_list"])
 def list_applications(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -163,7 +169,9 @@ def list_applications(
 
 
 @router.get("/upcoming-interviews", response_model=List[ApplicationSummary])
+@limiter.limit(LIMITS["app_list"])
 def get_upcoming_interviews(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -181,7 +189,9 @@ def get_upcoming_interviews(
 
 
 @router.get("/analytics", response_model=AnalyticsResponse)
+@limiter.limit(LIMITS["app_list"])
 def get_analytics(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -235,7 +245,9 @@ def get_analytics(
 
 
 @router.get("/{application_id}", response_model=ApplicationDetail)
+@limiter.limit(LIMITS["app_detail"])
 def get_application(
+    request: Request,
     application_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -260,7 +272,9 @@ def _flatten_cv_json(cv_json: dict) -> str:
 
 
 @router.patch("/{application_id}", response_model=ApplicationDetail)
+@limiter.limit(LIMITS["app_update"])
 def patch_application(
+    request: Request,
     application_id: int,
     body: ApplicationPatchRequest,
     current_user: User = Depends(get_current_user),
@@ -278,7 +292,9 @@ def patch_application(
 
 
 @router.patch("/{application_id}/status", response_model=ApplicationDetail)
+@limiter.limit(LIMITS["app_update"])
 def update_status(
+    request: Request,
     application_id: int,
     body: ApplicationStatusUpdate,
     current_user: User = Depends(get_current_user),
@@ -292,7 +308,9 @@ def update_status(
 
 
 @router.patch("/{application_id}/interview", response_model=ApplicationDetail)
+@limiter.limit(LIMITS["app_update"])
 def update_interview(
+    request: Request,
     application_id: int,
     body: InterviewUpdateRequest,
     current_user: User = Depends(get_current_user),
@@ -309,7 +327,9 @@ def update_interview(
 
 
 @router.patch("/{application_id}/response", response_model=ApplicationDetail)
+@limiter.limit(LIMITS["app_update"])
 def update_response(
+    request: Request,
     application_id: int,
     body: ResponseUpdateRequest,
     current_user: User = Depends(get_current_user),
@@ -328,7 +348,9 @@ def update_response(
 
 
 @router.post("/{application_id}/interview-prep", response_model=ApplicationDetail)
+@limiter.limit(LIMITS["app_interview_prep"])
 def create_interview_prep(
+    request: Request,
     application_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -358,7 +380,9 @@ def _safe_filename(text: str) -> str:
 
 
 @router.get("/{application_id}/export/cv")
+@limiter.limit(LIMITS["app_export_pdf"])
 def export_cv(
+    request: Request,
     application_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -383,7 +407,9 @@ def export_cv(
 
 
 @router.get("/{application_id}/export/cover-letter")
+@limiter.limit(LIMITS["app_export_pdf"])
 def export_cover_letter(
+    request: Request,
     application_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

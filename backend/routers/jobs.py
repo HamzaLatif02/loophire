@@ -2,12 +2,13 @@ import asyncio
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from services.adzuna_service import search_adzuna
 from services.job_scraper_service import scrape_job
 from services.reed_service import get_reed_job, search_reed
+from utils.rate_limiter import LIMITS, limiter
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ class JobImportRequest(BaseModel):
 
 
 @router.post("/search")
-def job_search(body: JobSearchRequest) -> List[dict]:
+@limiter.limit(LIMITS["job_search"])
+def job_search(request: Request, body: JobSearchRequest) -> List[dict]:
     kw = body.keywords.strip()
     if not kw:
         raise HTTPException(status_code=422, detail="keywords must not be empty")
@@ -67,7 +69,8 @@ def job_search(body: JobSearchRequest) -> List[dict]:
 
 
 @router.post("/import")
-async def job_import(body: JobImportRequest) -> dict:
+@limiter.limit(LIMITS["job_import"])
+async def job_import(request: Request, body: JobImportRequest) -> dict:
     if body.source == "reed":
         try:
             return get_reed_job(body.job_id)

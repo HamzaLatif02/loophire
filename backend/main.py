@@ -13,7 +13,8 @@ from routers import applications as applications_router
 from routers import cv as cv_router
 from routers import cvs as cvs_router
 from routers import jobs as jobs_router
-from routers.auth import limiter, router as auth_router
+from routers.auth import router as auth_router
+from utils.rate_limiter import limiter
 
 logging.basicConfig(
     level=logging.INFO,

@@ -2,19 +2,17 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, field_validator
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies.auth_dependency import get_current_user
 from models.user import User
 from utils.auth import create_access_token, hash_password, verify_password
+from utils.rate_limiter import LIMITS, limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-limiter = Limiter(key_func=get_remote_address)
 
 
 # ── schemas ───────────────────────────────────────────────────────────────────
@@ -53,7 +51,8 @@ class MeResponse(BaseModel):
 # ── endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=AuthResponse, status_code=201)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit(LIMITS["auth_register"])
+def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == body.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
@@ -76,7 +75,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=AuthResponse)
-@limiter.limit("5/minute")
+@limiter.limit(LIMITS["auth_login"])
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):

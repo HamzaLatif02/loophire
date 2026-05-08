@@ -20,6 +20,12 @@ api.interceptors.response.use(
       removeToken()
       window.location.href = '/login'
     }
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers['retry-after']
+      error.rateLimitMessage = retryAfter
+        ? `Too many requests. Please wait ${retryAfter} seconds before trying again.`
+        : 'Too many requests. Please slow down and try again shortly.'
+    }
     return Promise.reject(error)
   },
 )

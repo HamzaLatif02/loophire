@@ -87,7 +87,11 @@ export default function ApplyPage() {
       const res = await api.post('/applications/generate', payload)
       navigate(`/applications/${res.data.id}`)
     } catch (err) {
-      setFormError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Generation failed — please try again.')
+      if (err.response?.status === 429) {
+        setFormError(err.rateLimitMessage ?? "You've reached the generation limit. Please wait before trying again.")
+      } else {
+        setFormError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Generation failed — please try again.')
+      }
       setLoading(false)
     }
   }
@@ -144,7 +148,11 @@ export default function ApplyPage() {
       setResults(res.data)
       if (res.data.length === 0) setSearchError('No jobs found — try different keywords or location.')
     } catch (err) {
-      setSearchError(err.response?.data?.detail ?? 'Search failed — please try again.')
+      if (err.response?.status === 429) {
+        setSearchError(err.rateLimitMessage ?? 'Too many requests. Please slow down and try again shortly.')
+      } else {
+        setSearchError(err.response?.data?.detail ?? 'Search failed — please try again.')
+      }
     } finally {
       setSearching(false)
     }
@@ -160,7 +168,11 @@ export default function ApplyPage() {
       fillForm(res.data)
       setSearchSuccess('Job imported — review the details below.')
     } catch (err) {
-      setSearchError(err.response?.data?.detail ?? 'Import failed — please try again.')
+      if (err.response?.status === 429) {
+        setSearchError(err.rateLimitMessage ?? 'Too many requests. Please slow down and try again shortly.')
+      } else {
+        setSearchError(err.response?.data?.detail ?? 'Import failed — please try again.')
+      }
     } finally {
       setImportingId(null)
     }
@@ -198,7 +210,11 @@ export default function ApplyPage() {
       setLiSuccess(true)
     } catch (err) {
       const status = err.response?.status
-      setLiError(err.response?.data?.detail ?? 'Could not import this URL — please paste the job description manually.')
+      if (status === 429) {
+        setLiError(err.rateLimitMessage ?? 'Too many requests. Please slow down and try again shortly.')
+      } else {
+        setLiError(err.response?.data?.detail ?? 'Could not import this URL — please paste the job description manually.')
+      }
       if (status === 422 || status === 408) {
         setTimeout(() => jdRef.current?.focus(), 80)
       }

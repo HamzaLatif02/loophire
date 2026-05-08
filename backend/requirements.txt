@@ -16,4 +16,5 @@ curl-cffi
 bcrypt
 python-jose[cryptography]
 slowapi
+limits
 pydantic[email]
