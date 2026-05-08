@@ -1,18 +1,20 @@
 import asyncio
 import logging
 import re
+import uuid
 from collections import Counter
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from agents.fit_agent import analyse_fit
 from agents.interview_agent import generate_interview_prep
+from agents.tone_agent import analyse_tone
 from agents.writer_agent import write_application
-from database import get_db
+from database import SessionLocal, get_db
 from dependencies.auth_dependency import get_current_user
 from services.job_scraper_service import scrape_job
 from services.latex_export_service import generate_cv_pdf
@@ -33,6 +35,7 @@ from schemas.application import (
     ResponseUpdateRequest,
     ScrapeJobRequest,
 )
+from utils.progress import progress_manager
 from utils.rate_limiter import LIMITS, limiter
 
 logger = logging.getLogger(__name__)
@@ -50,6 +53,97 @@ def _get_application(application_id: int, user_id: int, db: Session) -> Applicat
         raise HTTPException(status_code=404, detail="Application not found")
     return app
 
+
+# ── Generation pipeline ───────────────────────────────────────────────────────
+
+async def run_generation_pipeline(
+    job_id: str,
+    user_id: int,
+    body: ApplicationGenerateRequest,
+    cv_text: str,
+    cv_links: list,
+    user_preferences,
+):
+    p = progress_manager
+    # Brief pause so the WebSocket client has time to connect
+    await asyncio.sleep(0.4)
+
+    try:
+        await p.send_progress(job_id, "cv", "CV loaded.", 8)
+
+        await p.send_progress(job_id, "research", "Researching the company…", 18)
+        try:
+            company_research = await asyncio.to_thread(research_company, body.company_name)
+        except Exception:
+            company_research = None
+
+        await p.send_progress(job_id, "tone", "Analysing job description tone…", 34)
+        tone_result: Optional[dict] = None
+        try:
+            tone_result = await asyncio.to_thread(analyse_tone, body.job_description)
+        except Exception as exc:
+            logger.warning("pipeline[%s]: tone analysis failed (non-fatal): %s", job_id, exc)
+
+        await p.send_progress(job_id, "fit", "Scoring your fit for this role…", 50)
+        fit_analysis = await asyncio.to_thread(analyse_fit, cv_text, body.job_description)
+
+        await p.send_progress(job_id, "cv_tailor", "Tailoring your CV…", 66)
+        written = await asyncio.to_thread(
+            write_application,
+            cv_text=cv_text,
+            job_description=body.job_description,
+            fit_analysis=fit_analysis,
+            company_research=company_research,
+            user_preferences=user_preferences,
+            cv_links=cv_links,
+            tone_analysis=tone_result,
+        )
+
+        await p.send_progress(job_id, "cover_letter", "Cover letter written.", 84)
+
+        await p.send_progress(job_id, "saving", "Saving your application…", 93)
+        db = SessionLocal()
+        try:
+            application = Application(
+                user_id=user_id,
+                job_title=body.job_title,
+                company_name=body.company_name,
+                job_description=body.job_description,
+                fit_score=fit_analysis.get("fit_score"),
+                keyword_gaps=fit_analysis.get("keyword_gaps"),
+                company_research=company_research,
+                tailored_cv=written["tailored_cv"],
+                tailored_cv_json=written["tailored_cv_json"],
+                cover_letter=written["cover_letter"],
+                tone_analysis=written.get("tone_analysis"),
+                status=ApplicationStatus.draft,
+            )
+            db.add(application)
+            db.commit()
+            db.refresh(application)
+            app_id = application.id
+        finally:
+            db.close()
+
+        await p.send_progress(job_id, "done", "Application ready!", 100, "done")
+        ws = p.connections.get(job_id)
+        if ws:
+            try:
+                await ws.send_json({
+                    "stage":          "complete",
+                    "application_id": app_id,
+                    "status":         "done",
+                    "percent":        100,
+                })
+            except Exception:
+                pass
+
+    except Exception as exc:
+        logger.error("Pipeline error for job %s: %s", job_id, exc, exc_info=True)
+        await p.send_error(job_id, "Something went wrong during generation. Please try again.")
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/scrape-job")
 @limiter.limit(LIMITS["app_scrape_job"])
@@ -71,14 +165,16 @@ async def scrape_job_endpoint(
         raise HTTPException(status_code=502, detail=str(exc))
 
 
-@router.post("/generate", response_model=ApplicationDetail, status_code=201)
+@router.post("/generate", status_code=202)
 @limiter.limit(LIMITS["app_generate"])
-def generate_application(
+async def generate_application(
     request: Request,
     body: ApplicationGenerateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Resolve CV synchronously so we can fail fast on missing CV
     cv_text: str | None = None
     cv_links: list = []
 
@@ -109,49 +205,20 @@ def generate_application(
             detail="No CV on file. Upload a CV before generating an application.",
         )
 
-    try:
-        fit_analysis = analyse_fit(cv_text, body.job_description)
-    except (RuntimeError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=f"Fit analysis failed: {exc}")
-
-    try:
-        company_research = research_company(body.company_name)
-    except (RuntimeError, ValueError):
-        company_research = None
-
     user_preferences = get_preferences(current_user.id)
+    job_id = str(uuid.uuid4())
 
-    try:
-        written = write_application(
-            cv_text=cv_text,
-            job_description=body.job_description,
-            fit_analysis=fit_analysis,
-            company_research=company_research,
-            user_preferences=user_preferences or None,
-            cv_links=cv_links,
-        )
-    except (RuntimeError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=f"Document generation failed: {exc}")
-
-    application = Application(
+    background_tasks.add_task(
+        run_generation_pipeline,
+        job_id=job_id,
         user_id=current_user.id,
-        job_title=body.job_title,
-        company_name=body.company_name,
-        job_description=body.job_description,
-        fit_score=fit_analysis.get("fit_score"),
-        keyword_gaps=fit_analysis.get("keyword_gaps"),
-        company_research=company_research,
-        tailored_cv=written["tailored_cv"],
-        tailored_cv_json=written["tailored_cv_json"],
-        cover_letter=written["cover_letter"],
-        tone_analysis=written.get("tone_analysis"),
-        status=ApplicationStatus.draft,
+        body=body,
+        cv_text=cv_text,
+        cv_links=cv_links,
+        user_preferences=user_preferences,
     )
-    db.add(application)
-    db.commit()
-    db.refresh(application)
 
-    return application
+    return {"job_id": job_id}
 
 
 @router.get("", response_model=List[ApplicationSummary])

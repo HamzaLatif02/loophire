@@ -19,4 +19,5 @@ bleach
 validators
 slowapi
 limits
+websockets
 pydantic[email]

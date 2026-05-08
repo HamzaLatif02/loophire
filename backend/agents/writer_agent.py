@@ -233,6 +233,7 @@ def write_application(
     company_research: Optional[dict] = None,
     user_preferences: Optional[dict] = None,
     cv_links: Optional[List[dict]] = None,
+    tone_analysis: Optional[dict] = None,
 ) -> dict:
     """Rewrite a CV as structured JSON and draft a tone-matched cover letter."""
     from utils.sanitiser import check_prompt_injection, sanitise_text
@@ -246,12 +247,12 @@ def write_application(
     links_context = _format_links_context(cv_links)
     cv_system = _build_system(_CV_SYSTEM_BASE, user_preferences)
 
-    # Detect JD tone — non-fatal if it fails
-    tone_analysis: Optional[dict] = None
-    try:
-        tone_analysis = analyse_tone(job_description)
-    except Exception as exc:
-        logger.warning("write_application: tone analysis failed (non-fatal): %s", exc)
+    # Detect JD tone — use pre-computed result if provided, otherwise compute internally
+    if tone_analysis is None:
+        try:
+            tone_analysis = analyse_tone(job_description)
+        except Exception as exc:
+            logger.warning("write_application: tone analysis failed (non-fatal): %s", exc)
 
     tone_block = _build_tone_block(tone_analysis)
     cover_system = _build_system(_COVER_LETTER_SYSTEM_BASE + tone_block, user_preferences)

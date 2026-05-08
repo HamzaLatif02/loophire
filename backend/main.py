@@ -14,6 +14,7 @@ from routers import applications as applications_router
 from routers import cv as cv_router
 from routers import cvs as cvs_router
 from routers import jobs as jobs_router
+from routers import ws as ws_router
 from routers.auth import router as auth_router
 from utils.rate_limiter import limiter
 
@@ -69,6 +70,7 @@ app.include_router(cv_router.router, prefix="/api/cv")
 app.include_router(cvs_router.router)
 app.include_router(applications_router.router)
 app.include_router(jobs_router.router)
+app.include_router(ws_router.router)
 
 
 # ── startup ───────────────────────────────────────────────────────────────────

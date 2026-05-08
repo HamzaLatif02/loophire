@@ -1,16 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import ErrorBanner from '../components/ErrorBanner'
+import GenerationProgress from '../components/GenerationProgress'
 import Spinner from '../components/Spinner'
+import { useGenerationProgress } from '../hooks/useGenerationProgress'
 import api from '../utils/api'
 
-
-const GEN_STEPS = [
-  { icon: '🔍', text: 'Researching company…' },
-  { icon: '📊', text: 'Scoring your fit…' },
-  { icon: '✍️',  text: 'Tailoring your CV…' },
-  { icon: '💌', text: 'Writing cover letter…' },
-]
 
 const LINKEDIN_STEPS = ['Fetching job listing...', 'Extracting job details...']
 
@@ -22,16 +16,15 @@ const inputCls =
 const SOURCES = ['reed', 'adzuna', 'both']
 
 export default function ApplyPage() {
-  const navigate  = useNavigate()
-  const jdRef     = useRef(null)
-  const formRef   = useRef(null)
-  const genInterval = useRef(null)
-  const liInterval  = useRef(null)
+  const jdRef    = useRef(null)
+  const formRef  = useRef(null)
+  const liInterval = useRef(null)
+
+  const { progress, isComplete, wsError, applicationId, connect, reset } = useGenerationProgress()
+  const [isGenerating, setIsGenerating] = useState(false)
 
   // ── form ────────────────────────────────────────────────────────────────────
-  const [form, setForm]     = useState({ job_title: '', company_name: '', job_description: '' })
-  const [loading, setLoading] = useState(false)
-  const [genStep, setGenStep] = useState(0)
+  const [form, setForm]         = useState({ job_title: '', company_name: '', job_description: '' })
   const [formError, setFormError] = useState('')
 
   // ── CV versions ─────────────────────────────────────────────────────────────
@@ -47,16 +40,6 @@ export default function ApplyPage() {
       })
       .catch(() => {})
   }, [])
-
-  useEffect(() => {
-    if (loading) {
-      setGenStep(0)
-      genInterval.current = setInterval(() => setGenStep(i => (i + 1) % GEN_STEPS.length), 3000)
-    } else {
-      clearInterval(genInterval.current)
-    }
-    return () => clearInterval(genInterval.current)
-  }, [loading])
 
   function setField(field) {
     return (e) => setForm(f => ({ ...f, [field]: e.target.value }))
@@ -79,20 +62,20 @@ export default function ApplyPage() {
       setFormError('Please fill in all three fields before generating.')
       return
     }
-    setLoading(true)
     setFormError('')
+    reset()
     try {
       const payload = { ...form }
       if (selectedCvId) payload.cv_version_id = selectedCvId
       const res = await api.post('/applications/generate', payload)
-      navigate(`/applications/${res.data.id}`)
+      connect(res.data.job_id)
+      setIsGenerating(true)
     } catch (err) {
       if (err.response?.status === 429) {
         setFormError(err.userMessage ?? "You've reached the generation limit. Please wait before trying again.")
       } else {
         setFormError(err.userMessage ?? err.response?.data?.detail ?? 'Generation failed — please try again.')
       }
-      setLoading(false)
     }
   }
 
@@ -291,52 +274,22 @@ export default function ApplyPage() {
         Can't find it? Paste the job description manually below.
       </p>
 
-      {/* ── generation loading overlay ── */}
-      {loading && (
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-          <div className="h-0.5 bg-[var(--color-surface-2)]">
-            <div
-              className="h-full bg-[var(--color-accent)] transition-all duration-[3000ms] ease-linear"
-              style={{ width: `${((genStep + 1) / GEN_STEPS.length) * 100}%` }}
-            />
-          </div>
-          <div className="px-6 py-10 flex flex-col items-center gap-6">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <span className="text-4xl" key={genStep}>{GEN_STEPS[genStep].icon}</span>
-              <p className="text-base font-semibold text-[var(--color-text)]">{GEN_STEPS[genStep].text}</p>
-              <p className="text-xs text-[var(--color-muted)]">This takes around 30–60 seconds</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {GEN_STEPS.map((step, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                      i < genStep ? 'bg-[var(--color-success)]'
-                      : i === genStep ? 'bg-[var(--color-accent)]'
-                      : 'bg-[var(--color-border)]'
-                    }`} />
-                    <span className={`text-xs transition-colors duration-300 hidden sm:inline ${
-                      i < genStep ? 'text-[var(--color-success)]'
-                      : i === genStep ? 'text-[var(--color-accent)]'
-                      : 'text-[var(--color-border)]'
-                    }`}>
-                      {step.text.replace('…', '')}
-                    </span>
-                  </div>
-                  {i < GEN_STEPS.length - 1 && <span className="text-[var(--color-border)] text-xs">›</span>}
-                </div>
-              ))}
-            </div>
-            <Spinner size={20} />
-          </div>
-        </div>
+      {/* ── generation progress ── */}
+      {isGenerating && (
+        <GenerationProgress
+          progress={progress}
+          isComplete={isComplete}
+          error={wsError}
+          applicationId={applicationId}
+          onReset={() => { setIsGenerating(false); reset() }}
+        />
       )}
 
       {/* ── form ── */}
       <form
         ref={formRef}
         onSubmit={generate}
-        className={`space-y-5 transition-opacity duration-200 ${loading ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}
+        className={`space-y-5 transition-opacity duration-200 ${isGenerating ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}
       >
         {/* CV selector */}
         {cvVersions.length > 0 && (
@@ -344,7 +297,7 @@ export default function ApplyPage() {
             <select
               value={selectedCvId ?? ''}
               onChange={e => setSelectedCvId(e.target.value ? Number(e.target.value) : null)}
-              disabled={loading}
+              disabled={isGenerating}
               className={inputCls}
             >
               {cvVersions.map(cv => (
@@ -370,7 +323,7 @@ export default function ApplyPage() {
               value={form.job_title}
               onChange={setField('job_title')}
               placeholder="e.g. Senior Software Engineer"
-              disabled={loading}
+              disabled={isGenerating}
               className={inputCls}
             />
           </Field>
@@ -380,7 +333,7 @@ export default function ApplyPage() {
               value={form.company_name}
               onChange={setField('company_name')}
               placeholder="e.g. Stripe"
-              disabled={loading}
+              disabled={isGenerating}
               className={inputCls}
             />
           </Field>
@@ -393,7 +346,7 @@ export default function ApplyPage() {
             onChange={setField('job_description')}
             placeholder="Paste the full job description here…"
             rows={10}
-            disabled={loading}
+            disabled={isGenerating}
             className={`${inputCls} resize-y min-h-[200px]`}
           />
         </Field>
@@ -402,7 +355,7 @@ export default function ApplyPage() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={isGenerating}
           className="w-full py-3 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors"
         >
           Generate Application →
