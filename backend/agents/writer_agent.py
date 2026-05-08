@@ -8,6 +8,7 @@ import anthropic
 from dotenv import load_dotenv
 
 from agents.tone_agent import analyse_tone
+from utils.claude_helpers import cached_system_prompt, cached_text_block, log_cache_stats, uncached_text_block
 
 load_dotenv()
 
@@ -131,7 +132,7 @@ def _format_links_context(cv_links: Optional[List[dict]]) -> str:
     return "\n".join(lines)
 
 
-def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int) -> str:
+def _call_claude(label: str, system_text: str, content_blocks: list, max_tokens: int) -> str:
     logger.info("writer_agent[%s]: calling %s (max_tokens=%d)", label, _MODEL, max_tokens)
     t0 = time.monotonic()
 
@@ -139,14 +140,8 @@ def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int
         message = _get_client().messages.create(
             model=_MODEL,
             max_tokens=max_tokens,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_text,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=[{"role": "user", "content": user_prompt}],
+            system=cached_system_prompt(system_text),
+            messages=[{"role": "user", "content": content_blocks}],
         )
     except anthropic.APIError as exc:
         logger.error(
@@ -155,15 +150,8 @@ def _call_claude(label: str, system_text: str, user_prompt: str, max_tokens: int
         raise RuntimeError(f"Claude API error: {exc}") from exc
 
     elapsed = time.monotonic() - t0
-    usage = message.usage
-    logger.info(
-        "writer_agent[%s]: completed in %.1fs — input_tokens=%d output_tokens=%d cache_read=%d",
-        label,
-        elapsed,
-        usage.input_tokens,
-        usage.output_tokens,
-        getattr(usage, "cache_read_input_tokens", 0),
-    )
+    log_cache_stats(logger, f"writer_agent[{label}]", message.usage)
+    logger.info("writer_agent[%s]: completed in %.1fs", label, elapsed)
 
     result = message.content[0].text.strip()
     if not result:
@@ -257,7 +245,7 @@ def write_application(
     tone_block = _build_tone_block(tone_analysis)
     cover_system = _build_system(_COVER_LETTER_SYSTEM_BASE + tone_block, user_preferences)
 
-    cv_prompt = f"""\
+    _CV_TAILOR_INSTRUCTIONS = """\
 Rewrite the CV below to better match the job description and return it as a JSON object.
 
 RULES:
@@ -269,49 +257,47 @@ RULES:
 - Return ONLY the JSON object — no markdown fences, no commentary.
 
 JSON SCHEMA (return exactly this structure):
-{{
+{
   "profile": "tailored profile paragraph as a single string",
   "technical_skills": [
-    {{"category": "category name", "items": "comma-separated items"}}
+    {"category": "category name", "items": "comma-separated items"}
   ],
   "education": [
-    {{
+    {
       "institution": "university name",
       "degree": "degree title",
       "dates": "date range e.g. Sept 2021 - June 2025",
       "highlights": ["bullet point 1", "bullet point 2"]
-    }}
+    }
   ],
   "experience": [
-    {{
+    {
       "title": "job title",
       "company": "company name",
       "dates": "date range",
       "highlights": ["bullet point 1", "bullet point 2"]
-    }}
+    }
   ],
   "projects": [
-    {{
+    {
       "name": "project name",
       "github_url": "exact github URL from links list, or empty string",
       "live_url": "exact live URL from links list, or empty string",
       "highlights": ["bullet point 1", "bullet point 2"]
-    }}
+    }
   ]
-}}
+}"""
 
-{fit_summary}
+    cv_blocks = [
+        # CV text is stable per user — cached as the last stable block before dynamic content
+        cached_text_block(f"{_CV_TAILOR_INSTRUCTIONS}\n\n--- ORIGINAL CV ---\n{cv_text}"),
+        # Dynamic content: fit analysis, links, and job description — not cached
+        uncached_text_block(
+            f"--- FIT ANALYSIS ---\n{fit_summary}\n\n{links_context}\n\n--- JOB DESCRIPTION ---\n{job_description}"
+        ),
+    ]
 
-{links_context}
-
---- ORIGINAL CV ---
-{cv_text}
-
---- JOB DESCRIPTION ---
-{job_description}
-"""
-
-    cv_raw = _call_claude("cv", cv_system, cv_prompt, max_tokens=4096)
+    cv_raw = _call_claude("cv", cv_system, cv_blocks, max_tokens=4096)
 
     try:
         tailored_cv_json = _parse_json_response(cv_raw)
@@ -325,7 +311,7 @@ JSON SCHEMA (return exactly this structure):
 
     tailored_cv_text = _json_to_plain_text(tailored_cv_json)
 
-    cover_prompt = f"""\
+    _COVER_LETTER_INSTRUCTIONS = """\
 Write a cover letter for the application below.
 
 RULES:
@@ -335,19 +321,17 @@ RULES:
 - The evidence paragraph must cite 2-3 concrete, specific achievements or skills from my CV.
 - The close must reference something specific about the company (culture, mission, product).
 - Warm but professional tone. No clichés ("I am writing to apply…").
-- Plain text only.
+- Plain text only."""
 
-{fit_summary}
-
-{company_context}
-
---- CV ---
-{cv_text}
-
---- JOB DESCRIPTION ---
-{job_description}
-"""
-    cover_letter = _call_claude("cover_letter", cover_system, cover_prompt, max_tokens=1024)
+    cover_blocks = [
+        # CV text is stable per user — cached as the last stable block
+        cached_text_block(f"{_COVER_LETTER_INSTRUCTIONS}\n\n--- CV ---\n{cv_text}"),
+        # Dynamic content: fit analysis, company research, job description — not cached
+        uncached_text_block(
+            f"--- FIT ANALYSIS ---\n{fit_summary}\n\n{company_context}\n\n--- JOB DESCRIPTION ---\n{job_description}"
+        ),
+    ]
+    cover_letter = _call_claude("cover_letter", cover_system, cover_blocks, max_tokens=1024)
 
     return {
         "tailored_cv": tailored_cv_text,

@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from utils.claude_helpers import cached_system_prompt, cached_text_block, log_cache_stats, uncached_text_block
+
 logger = logging.getLogger("loophire.agents.interview")
 
 _MODEL = "claude-sonnet-4-6"
@@ -25,46 +27,34 @@ def _get_client() -> anthropic.Anthropic:
 _SYSTEM_PROMPT = (
     "You are an expert interview coach and technical recruiter. "
     "You create targeted, insightful interview questions based on job descriptions and candidate CVs. "
-    "You always respond with valid JSON only — no markdown fences, no prose outside the JSON object."
+    "You always respond with valid JSON only — no markdown fences, no prose outside the JSON object.\n\n"
+    "When asked to generate interview preparation, return ONLY a JSON object with exactly this structure:\n"
+    "{\n"
+    '  "technical": [\n'
+    '    {"question": "<specific technical question>", "framework": "<suggested answer guidance>"},\n'
+    "    ... (5 questions total)\n"
+    "  ],\n"
+    '  "behavioural": [\n'
+    '    {"question": "<behavioural question based on JD values>", "framework": "<STAR method: Situation, Task, Action, Result>"},\n'
+    "    ... (3 questions total)\n"
+    "  ],\n"
+    '  "cv_based": [\n'
+    '    {"question": "<question probing a specific experience from the CV>", "framework": "<talking points based on their background>"},\n'
+    "    ... (3 questions total)\n"
+    "  ]\n"
+    "}\n\n"
+    "Rules:\n"
+    "- Technical questions must target specific technologies, architectures, and responsibilities in the JD\n"
+    "- Behavioural questions must reference the values and working style implied by the JD\n"
+    "- CV-based questions must reference specific projects, roles, or achievements visible in the CV\n"
+    "- Each framework should be 2-4 sentences guiding how to structure and what to include in the answer\n"
+    "- Do not repeat questions across categories"
 )
 
-_USER_TEMPLATE = """\
-Generate interview preparation questions for a candidate applying to the role described below.
-
-Return ONLY a JSON object with exactly this structure:
-{{
-  "technical": [
-    {{"question": "<specific technical question>", "framework": "<suggested answer guidance>"}},
-    {{"question": "<specific technical question>", "framework": "<suggested answer guidance>"}},
-    {{"question": "<specific technical question>", "framework": "<suggested answer guidance>"}},
-    {{"question": "<specific technical question>", "framework": "<suggested answer guidance>"}},
-    {{"question": "<specific technical question>", "framework": "<suggested answer guidance>"}}
-  ],
-  "behavioural": [
-    {{"question": "<behavioural question based on JD values>", "framework": "<STAR method: Situation, Task, Action, Result>"}},
-    {{"question": "<behavioural question based on JD values>", "framework": "<STAR method: Situation, Task, Action, Result>"}},
-    {{"question": "<behavioural question based on JD values>", "framework": "<STAR method: Situation, Task, Action, Result>"}}
-  ],
-  "cv_based": [
-    {{"question": "<question probing a specific experience from the CV>", "framework": "<talking points based on their background>"}},
-    {{"question": "<question probing a specific experience from the CV>", "framework": "<talking points based on their background>"}},
-    {{"question": "<question probing a specific experience from the CV>", "framework": "<talking points based on their background>"}}
-  ]
-}}
-
-Rules:
-- Technical questions must target specific technologies, architectures, and responsibilities in the JD
-- Behavioural questions must reference the values and working style implied by the JD
-- CV-based questions must reference specific projects, roles, or achievements visible in the CV
-- Each framework should be 2-4 sentences guiding how to structure and what to include in the answer
-- Do not repeat questions across categories
-
---- JOB DESCRIPTION ---
-{job_description}
-
---- CANDIDATE CV ---
-{cv_text}
-"""
+_CV_INTRO = (
+    "Generate interview preparation questions for a candidate applying to the role described below.\n\n"
+    "--- CANDIDATE CV ---\n"
+)
 
 
 def _strip_fences(text: str) -> str:
@@ -82,8 +72,6 @@ def generate_interview_prep(job_description: str, cv_text: str) -> dict:
     check_prompt_injection(job_description, "job description")
     check_prompt_injection(cv_text, "CV")
 
-    prompt = _USER_TEMPLATE.format(job_description=job_description, cv_text=cv_text)
-
     logger.info("interview_agent: calling %s", _MODEL)
     t0 = time.monotonic()
 
@@ -91,27 +79,24 @@ def generate_interview_prep(job_description: str, cv_text: str) -> dict:
         response = _get_client().messages.create(
             model=_MODEL,
             max_tokens=2048,
-            system=[
-                {
-                    "type": "text",
-                    "text": _SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=[{"role": "user", "content": prompt}],
+            system=cached_system_prompt(_SYSTEM_PROMPT),
+            messages=[{
+                "role": "user",
+                "content": [
+                    # CV text is stable per user — cached as the last stable block
+                    cached_text_block(f"{_CV_INTRO}{cv_text}"),
+                    # Job description changes every request — not cached
+                    uncached_text_block(f"--- JOB DESCRIPTION ---\n{job_description}"),
+                ],
+            }],
         )
     except anthropic.APIError as exc:
         logger.error("interview_agent: API error after %.1fs: %s", time.monotonic() - t0, exc)
         raise RuntimeError(f"Claude API error: {exc}") from exc
 
     elapsed = time.monotonic() - t0
-    usage = response.usage
-    logger.info(
-        "interview_agent: completed in %.1fs — input_tokens=%d output_tokens=%d",
-        elapsed,
-        usage.input_tokens,
-        usage.output_tokens,
-    )
+    log_cache_stats(logger, "interview_agent", response.usage)
+    logger.info("interview_agent: completed in %.1fs", elapsed)
 
     raw = response.content[0].text
     if not raw.strip():

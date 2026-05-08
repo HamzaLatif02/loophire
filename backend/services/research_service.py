@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from utils.claude_helpers import cached_system_prompt, log_cache_stats
+
 logger = logging.getLogger("loophire.services.research")
 
 _MODEL = "claude-haiku-4-5-20251001"
@@ -144,13 +146,7 @@ def research_company(company_name: str) -> Optional[dict]:
         message = _get_anthropic().messages.create(
             model=_MODEL,
             max_tokens=1024,
-            system=[
-                {
-                    "type": "text",
-                    "text": _SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
+            system=cached_system_prompt(_SYSTEM_PROMPT),
             messages=[{"role": "user", "content": prompt}],
         )
     except anthropic.APIError as exc:
@@ -158,14 +154,8 @@ def research_company(company_name: str) -> Optional[dict]:
         raise RuntimeError(f"Claude API error during research synthesis: {exc}") from exc
 
     elapsed = time.monotonic() - t0
-    usage = message.usage
-    logger.info(
-        "research: synthesis completed in %.1fs — input_tokens=%d output_tokens=%d cache_read=%d",
-        elapsed,
-        usage.input_tokens,
-        usage.output_tokens,
-        getattr(usage, "cache_read_input_tokens", 0),
-    )
+    log_cache_stats(logger, "research_service", message.usage)
+    logger.info("research: synthesis completed in %.1fs", elapsed)
 
     raw = message.content[0].text.strip()
     cleaned = _strip_fences(raw)
