@@ -3,7 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import CVEditor from '../components/CVEditor'
 import EditableTextArea from '../components/EditableTextArea'
 import ErrorBanner from '../components/ErrorBanner'
+import GenerationProgress from '../components/GenerationProgress'
 import Spinner from '../components/Spinner'
+import { useGenerationProgress } from '../hooks/useGenerationProgress'
 import api from '../utils/api'
 
 
@@ -50,6 +52,18 @@ function scoreFitLabel(score) {
 
 // ─── page ────────────────────────────────────────────────────────────────────
 
+function relativeTime(isoStr) {
+  if (!isoStr) return null
+  const diff = Date.now() - new Date(isoStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1)   return 'just now'
+  if (mins < 60)  return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24)   return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
+
 function toDatetimeLocal(isoStr) {
   if (!isoStr) return ''
   const d = new Date(isoStr)
@@ -76,7 +90,17 @@ export default function ApplicationDetailPage() {
   const [responseSaved, setResponseSaved]       = useState(false)
   const [generatingPrep, setGeneratingPrep]     = useState(false)
   const [prepError, setPrepError]               = useState('')
+  const [showRegenModal, setShowRegenModal]     = useState(false)
+  const [isRegenerating, setIsRegenerating]     = useState(false)
   const dropdownRef = useRef(null)
+
+  const {
+    progress: regenProgress,
+    isComplete: regenComplete,
+    wsError: regenWsError,
+    connect: regenConnect,
+    reset: regenReset,
+  } = useGenerationProgress()
 
   useEffect(() => {
     api.get(`/applications/${id}`)
@@ -104,6 +128,32 @@ export default function ApplicationDetailPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  useEffect(() => {
+    if (!regenComplete) return
+    api.get(`/applications/${id}`)
+      .then((r) => {
+        setApp(r.data)
+        setIsRegenerating(false)
+        regenReset()
+      })
+      .catch(() => {
+        setIsRegenerating(false)
+        regenReset()
+      })
+  }, [regenComplete]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function startRegeneration() {
+    setShowRegenModal(false)
+    setIsRegenerating(true)
+    try {
+      const r = await api.post(`/applications/${id}/regenerate`)
+      regenConnect(r.data.job_id)
+    } catch (err) {
+      setIsRegenerating(false)
+      setError(err.userMessage ?? err.response?.data?.detail ?? 'Failed to start regeneration.')
+    }
+  }
 
   async function patchApplication(fields) {
     const r = await api.patch(`/applications/${id}`, fields)
@@ -201,6 +251,48 @@ export default function ApplicationDetailPage() {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
 
+      {/* ── regeneration overlay ── */}
+      {isRegenerating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
+          <div className="w-full max-w-md">
+            <GenerationProgress
+              progress={regenProgress}
+              isComplete={regenComplete}
+              error={regenWsError}
+              applicationId={null}
+              onReset={() => { setIsRegenerating(false); regenReset() }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── confirm regenerate modal ── */}
+      {showRegenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4">
+            <h2 className="text-base font-bold text-[var(--color-text)]">Regenerate application?</h2>
+            <p className="text-sm text-[var(--color-muted)] leading-relaxed">
+              This will overwrite your tailored CV, cover letter, fit score, tone analysis, and company
+              research. Your status, notes, and interview details will be preserved.
+            </p>
+            <div className="flex gap-3 justify-end pt-1">
+              <button
+                onClick={() => setShowRegenModal(false)}
+                className="px-4 py-2 rounded-lg text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] border border-[var(--color-border)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={startRegeneration}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white transition-colors"
+              >
+                Regenerate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── back ── */}
       <button
         onClick={() => navigate('/applications')}
@@ -230,8 +322,26 @@ export default function ApplicationDetailPage() {
             <p className="text-base text-[var(--color-muted)] mt-0.5">{app.company_name}</p>
             <p className="text-xs text-[var(--color-muted)] mt-2 tabular-nums">
               Created {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {app.last_generated_at && (
+                <span className="ml-3 text-[var(--color-muted)]">
+                  · Last generated: {relativeTime(app.last_generated_at)}
+                </span>
+              )}
             </p>
           </div>
+
+          {/* regenerate button */}
+          <button
+            onClick={() => setShowRegenModal(true)}
+            disabled={isRegenerating}
+            title="Re-run the full generation pipeline"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+            </svg>
+            Regenerate
+          </button>
 
           {/* status dropdown */}
           <div className="shrink-0" ref={dropdownRef}>

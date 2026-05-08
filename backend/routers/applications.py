@@ -143,6 +143,104 @@ async def run_generation_pipeline(
         await p.send_error(job_id, "Something went wrong during generation. Please try again.")
 
 
+async def run_regeneration_pipeline(
+    job_id: str,
+    application_id: int,
+    user_id: int,
+    cv_text: str,
+    cv_links: list,
+    user_preferences,
+):
+    p = progress_manager
+    await asyncio.sleep(0.4)
+
+    try:
+        # Fetch the application's stored fields inside the pipeline
+        db = SessionLocal()
+        try:
+            application = db.query(Application).filter(
+                Application.id == application_id, Application.user_id == user_id
+            ).first()
+            if not application:
+                await p.send_error(job_id, "Application not found.")
+                return
+            job_title       = application.job_title
+            company_name    = application.company_name
+            job_description = application.job_description
+        finally:
+            db.close()
+
+        await p.send_progress(job_id, "cv", "CV loaded.", 8)
+
+        await p.send_progress(job_id, "research", "Researching the company…", 18)
+        try:
+            company_research = await asyncio.to_thread(research_company, company_name)
+        except Exception:
+            company_research = None
+
+        await p.send_progress(job_id, "tone", "Analysing job description tone…", 34)
+        tone_result: Optional[dict] = None
+        try:
+            tone_result = await asyncio.to_thread(analyse_tone, job_description)
+        except Exception as exc:
+            logger.warning("regen[%s]: tone analysis failed (non-fatal): %s", job_id, exc)
+
+        await p.send_progress(job_id, "fit", "Scoring your fit for this role…", 50)
+        fit_analysis = await asyncio.to_thread(analyse_fit, cv_text, job_description)
+
+        await p.send_progress(job_id, "cv_tailor", "Tailoring your CV…", 66)
+        written = await asyncio.to_thread(
+            write_application,
+            cv_text=cv_text,
+            job_description=job_description,
+            fit_analysis=fit_analysis,
+            company_research=company_research,
+            user_preferences=user_preferences,
+            cv_links=cv_links,
+            tone_analysis=tone_result,
+        )
+
+        await p.send_progress(job_id, "cover_letter", "Cover letter written.", 84)
+
+        await p.send_progress(job_id, "saving", "Saving your application…", 93)
+        db = SessionLocal()
+        try:
+            application = db.query(Application).filter(
+                Application.id == application_id, Application.user_id == user_id
+            ).first()
+            if not application:
+                await p.send_error(job_id, "Application not found.")
+                return
+            application.fit_score        = fit_analysis.get("fit_score")
+            application.keyword_gaps     = fit_analysis.get("keyword_gaps")
+            application.company_research = company_research
+            application.tailored_cv      = written["tailored_cv"]
+            application.tailored_cv_json = written["tailored_cv_json"]
+            application.cover_letter     = written["cover_letter"]
+            application.tone_analysis    = written.get("tone_analysis")
+            application.last_generated_at = datetime.now(timezone.utc)
+            db.commit()
+        finally:
+            db.close()
+
+        await p.send_progress(job_id, "done", "Application ready!", 100, "done")
+        ws = p.connections.get(job_id)
+        if ws:
+            try:
+                await ws.send_json({
+                    "stage":          "complete",
+                    "application_id": application_id,
+                    "status":         "done",
+                    "percent":        100,
+                })
+            except Exception:
+                pass
+
+    except Exception as exc:
+        logger.error("Regen pipeline error for job %s: %s", job_id, exc, exc_info=True)
+        await p.send_error(job_id, "Something went wrong during regeneration. Please try again.")
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/scrape-job")
@@ -213,6 +311,56 @@ async def generate_application(
         job_id=job_id,
         user_id=current_user.id,
         body=body,
+        cv_text=cv_text,
+        cv_links=cv_links,
+        user_preferences=user_preferences,
+    )
+
+    return {"job_id": job_id}
+
+
+@router.post("/{application_id}/regenerate", status_code=202)
+@limiter.limit(LIMITS["app_regenerate"])
+async def regenerate_application(
+    request: Request,
+    application_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    application = _get_application(application_id, current_user.id, db)
+
+    if not application.job_description:
+        raise HTTPException(status_code=400, detail="No job description stored — cannot regenerate.")
+
+    cv_text: str | None = None
+    cv_links: list = []
+
+    default_ver = (
+        db.query(CVVersion)
+        .filter(CVVersion.user_id == current_user.id, CVVersion.is_default == True)  # noqa: E712
+        .first()
+    )
+    if default_ver:
+        cv_text = default_ver.cv_text
+    else:
+        cv_text = current_user.base_cv_text
+        cv_links = current_user.cv_links or []
+
+    if not cv_text:
+        raise HTTPException(
+            status_code=400,
+            detail="No CV on file. Upload a CV before regenerating.",
+        )
+
+    user_preferences = get_preferences(current_user.id)
+    job_id = str(uuid.uuid4())
+
+    background_tasks.add_task(
+        run_regeneration_pipeline,
+        job_id=job_id,
+        application_id=application_id,
+        user_id=current_user.id,
         cv_text=cv_text,
         cv_links=cv_links,
         user_preferences=user_preferences,

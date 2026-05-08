@@ -28,6 +28,7 @@ LIMITS = {
     "cv_list":            "60/minute",
     # Application generation — hits Claude API
     "app_generate":       "10/hour",
+    "app_regenerate":     "10/hour",
     "app_list":           "60/minute",
     "app_detail":         "60/minute",
     "app_update":         "30/minute",
