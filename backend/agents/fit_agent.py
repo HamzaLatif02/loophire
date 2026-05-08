@@ -57,6 +57,12 @@ def _strip_fences(text: str) -> str:
 
 def analyse_fit(cv_text: str, job_description: str) -> dict:
     """Score a CV against a job description and return structured analysis."""
+    from utils.sanitiser import check_prompt_injection, sanitise_text
+    cv_text = sanitise_text(cv_text, "cv_text")
+    job_description = sanitise_text(job_description, "job_description")
+    check_prompt_injection(job_description, "job description")
+    check_prompt_injection(cv_text, "CV")
+
     prompt = _USER_TEMPLATE.format(cv_text=cv_text, job_description=job_description)
 
     logger.info("fit_agent: calling %s (max_tokens=1024)", _MODEL)

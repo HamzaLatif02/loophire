@@ -56,6 +56,9 @@ Rules:
 
 def analyse_tone(job_description: str) -> dict:
     """Analyse the tone of a job description and return structured guidance."""
+    from utils.sanitiser import sanitise_text
+    job_description = sanitise_text(job_description, "job_description")
+
     prompt = _PROMPT.format(job_description=job_description[:4000])
     logger.info("tone_agent: analysing JD tone with %s", _MODEL)
 

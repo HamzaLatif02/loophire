@@ -88,9 +88,9 @@ export default function ApplyPage() {
       navigate(`/applications/${res.data.id}`)
     } catch (err) {
       if (err.response?.status === 429) {
-        setFormError(err.rateLimitMessage ?? "You've reached the generation limit. Please wait before trying again.")
+        setFormError(err.userMessage ?? "You've reached the generation limit. Please wait before trying again.")
       } else {
-        setFormError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Generation failed — please try again.')
+        setFormError(err.userMessage ?? err.response?.data?.detail ?? 'Generation failed — please try again.')
       }
       setLoading(false)
     }
@@ -149,7 +149,7 @@ export default function ApplyPage() {
       if (res.data.length === 0) setSearchError('No jobs found — try different keywords or location.')
     } catch (err) {
       if (err.response?.status === 429) {
-        setSearchError(err.rateLimitMessage ?? 'Too many requests. Please slow down and try again shortly.')
+        setSearchError(err.userMessage ?? 'Too many requests. Please slow down and try again shortly.')
       } else {
         setSearchError(err.response?.data?.detail ?? 'Search failed — please try again.')
       }
@@ -169,7 +169,7 @@ export default function ApplyPage() {
       setSearchSuccess('Job imported — review the details below.')
     } catch (err) {
       if (err.response?.status === 429) {
-        setSearchError(err.rateLimitMessage ?? 'Too many requests. Please slow down and try again shortly.')
+        setSearchError(err.userMessage ?? 'Too many requests. Please slow down and try again shortly.')
       } else {
         setSearchError(err.response?.data?.detail ?? 'Import failed — please try again.')
       }
@@ -211,7 +211,7 @@ export default function ApplyPage() {
     } catch (err) {
       const status = err.response?.status
       if (status === 429) {
-        setLiError(err.rateLimitMessage ?? 'Too many requests. Please slow down and try again shortly.')
+        setLiError(err.userMessage ?? 'Too many requests. Please slow down and try again shortly.')
       } else {
         setLiError(err.response?.data?.detail ?? 'Could not import this URL — please paste the job description manually.')
       }

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from routers import applications as applications_router
 from routers import cv as cv_router
@@ -23,6 +24,19 @@ logging.basicConfig(
 )
 
 app = FastAPI(title="Loophire API")
+
+# ── security headers ──────────────────────────────────────────────────────────
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ── rate limiter ──────────────────────────────────────────────────────────────
 
@@ -89,14 +103,14 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    messages = []
+    errors = []
     for err in exc.errors():
-        loc = " → ".join(str(l) for l in err["loc"] if l != "body")
-        messages.append(f"{loc}: {err['msg']}" if loc else err["msg"])
-    detail = "; ".join(messages)
+        field = " → ".join(str(loc) for loc in err["loc"] if loc != "body")
+        message = err["msg"].replace("Value error, ", "")
+        errors.append({"field": field, "message": message})
     return JSONResponse(
         status_code=422,
-        content={"error": detail, "status_code": 422},
+        content={"detail": "Validation failed", "errors": errors},
     )
 
 

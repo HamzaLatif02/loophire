@@ -5,7 +5,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ from schemas.application import (
     ApplicationSummary,
     InterviewUpdateRequest,
     ResponseUpdateRequest,
+    ScrapeJobRequest,
 )
 from utils.rate_limiter import LIMITS, limiter
 
@@ -54,11 +55,11 @@ def _get_application(application_id: int, user_id: int, db: Session) -> Applicat
 @limiter.limit(LIMITS["app_scrape_job"])
 async def scrape_job_endpoint(
     request: Request,
-    url: str = Body(..., embed=True),
+    body: ScrapeJobRequest,
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return await asyncio.wait_for(scrape_job(url), timeout=25.0)
+        return await asyncio.wait_for(scrape_job(body.url), timeout=25.0)
     except asyncio.TimeoutError:
         raise HTTPException(
             status_code=408,

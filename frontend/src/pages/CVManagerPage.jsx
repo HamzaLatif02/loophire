@@ -62,7 +62,7 @@ export default function CVManagerPage() {
       if (fileRef.current) fileRef.current.value = ''
       await fetchVersions()
     } catch (err) {
-      setUploadError(err.response?.data?.detail ?? 'Upload failed — please try again.')
+      setUploadError(err.userMessage ?? err.response?.data?.detail ?? 'Upload failed — please try again.')
     } finally {
       setUploading(false)
     }

@@ -35,7 +35,7 @@ export default function RegisterPage() {
       setToken(res.data.access_token)
       navigate('/apply')
     } catch (err) {
-      setError(err.response?.data?.detail ?? err.response?.data?.error ?? 'Registration failed — please try again.')
+      setError(err.userMessage ?? err.response?.data?.detail ?? 'Registration failed — please try again.')
     } finally {
       setLoading(false)
     }

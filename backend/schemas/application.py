@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from models.application import ApplicationStatus
+from utils.sanitiser import check_prompt_injection, sanitise_text, sanitise_url
 
 
 RESPONSE_TYPES = ["recruiter screen", "technical interview", "rejection", "offer"]
@@ -14,6 +15,43 @@ class ApplicationGenerateRequest(BaseModel):
     company_name: str
     job_description: str
     cv_version_id: Optional[int] = None
+
+    @field_validator("job_title")
+    @classmethod
+    def validate_job_title(cls, v: str) -> str:
+        v = sanitise_text(v, "job_title")
+        if len(v) < 2:
+            raise ValueError("Job title must be at least 2 characters.")
+        return v
+
+    @field_validator("company_name")
+    @classmethod
+    def validate_company_name(cls, v: str) -> str:
+        v = sanitise_text(v, "company_name")
+        if len(v) < 2:
+            raise ValueError("Company name must be at least 2 characters.")
+        return v
+
+    @field_validator("job_description")
+    @classmethod
+    def validate_job_description(cls, v: str) -> str:
+        v = sanitise_text(v, "job_description")
+        if len(v) < 50:
+            raise ValueError(
+                "Job description is too short. "
+                "Please paste the full job description (at least 50 characters)."
+            )
+        check_prompt_injection(v, "job description")
+        return v
+
+
+class ScrapeJobRequest(BaseModel):
+    url: str
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        return sanitise_url(v)
 
 
 class ApplicationSummary(BaseModel):
@@ -66,15 +104,38 @@ class ApplicationPatchRequest(BaseModel):
     tailored_cv_json: Optional[Dict[str, Any]] = None
     cover_letter: Optional[str] = None
 
+    @field_validator("cover_letter")
+    @classmethod
+    def validate_cover_letter(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitise_text(v, "cover_letter")
+
 
 class InterviewUpdateRequest(BaseModel):
     interview_date: Optional[datetime] = None
     interview_notes: Optional[str] = None
 
+    @field_validator("interview_notes")
+    @classmethod
+    def validate_interview_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitise_text(v, "notes")
+
 
 class ResponseUpdateRequest(BaseModel):
     got_response: bool
     response_type: Optional[str] = None
+
+    @field_validator("response_type")
+    @classmethod
+    def validate_response_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v not in RESPONSE_TYPES:
+            raise ValueError(f"Response type must be one of: {', '.join(RESPONSE_TYPES)}")
+        return v
 
 
 class AnalyticsResponse(BaseModel):

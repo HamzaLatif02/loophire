@@ -76,6 +76,12 @@ def _strip_fences(text: str) -> str:
 
 def generate_interview_prep(job_description: str, cv_text: str) -> dict:
     """Generate structured interview questions for a role/CV combination."""
+    from utils.sanitiser import check_prompt_injection, sanitise_text
+    cv_text = sanitise_text(cv_text, "cv_text")
+    job_description = sanitise_text(job_description, "job_description")
+    check_prompt_injection(job_description, "job description")
+    check_prompt_injection(cv_text, "CV")
+
     prompt = _USER_TEMPLATE.format(job_description=job_description, cv_text=cv_text)
 
     logger.info("interview_agent: calling %s", _MODEL)

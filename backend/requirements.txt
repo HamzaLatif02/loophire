@@ -15,6 +15,8 @@ readability-lxml
 curl-cffi
 bcrypt
 python-jose[cryptography]
+bleach
+validators
 slowapi
 limits
 pydantic[email]

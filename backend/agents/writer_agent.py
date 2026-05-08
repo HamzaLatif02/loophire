@@ -235,6 +235,12 @@ def write_application(
     cv_links: Optional[List[dict]] = None,
 ) -> dict:
     """Rewrite a CV as structured JSON and draft a tone-matched cover letter."""
+    from utils.sanitiser import check_prompt_injection, sanitise_text
+    cv_text = sanitise_text(cv_text, "cv_text")
+    job_description = sanitise_text(job_description, "job_description")
+    check_prompt_injection(job_description, "job description")
+    check_prompt_injection(cv_text, "CV")
+
     fit_summary = _format_fit_summary(fit_analysis)
     company_context = _format_company_context(company_research)
     links_context = _format_links_context(cv_links)

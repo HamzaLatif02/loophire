@@ -22,9 +22,19 @@ api.interceptors.response.use(
     }
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers['retry-after']
-      error.rateLimitMessage = retryAfter
+      error.userMessage = retryAfter
         ? `Too many requests. Please wait ${retryAfter} seconds before trying again.`
         : 'Too many requests. Please slow down and try again shortly.'
+    }
+    if (error.response?.status === 422) {
+      const data = error.response.data
+      if (data?.errors && Array.isArray(data.errors)) {
+        error.userMessage = data.errors
+          .map(e => (e.field ? `${e.field}: ${e.message}` : e.message))
+          .join('\n')
+      } else {
+        error.userMessage = data?.detail || 'Please check your inputs and try again.'
+      }
     }
     return Promise.reject(error)
   },

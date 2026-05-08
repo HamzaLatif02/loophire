@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/cvs", tags=["cvs"])
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
 
 # ── schemas ───────────────────────────────────────────────────────────────────
@@ -78,11 +78,15 @@ async def upload_cv_version(
     db: Session = Depends(get_db),
 ):
     if file.content_type not in ("application/pdf", "application/octet-stream"):
-        raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
+        raise HTTPException(status_code=422, detail="Only PDF files are accepted.")
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=422, detail="File must have a .pdf extension.")
 
     raw = await file.read()
     if len(raw) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File exceeds the 10 MB limit.")
+        raise HTTPException(status_code=422, detail="File size must be under 5 MB.")
+    if not raw.startswith(b"%PDF"):
+        raise HTTPException(status_code=422, detail="The uploaded file does not appear to be a valid PDF.")
 
     try:
         parsed = parse_pdf_with_links(raw)

@@ -9,6 +9,7 @@ from dependencies.auth_dependency import get_current_user
 from models.user import User
 from utils.auth import create_access_token, hash_password, verify_password
 from utils.rate_limiter import LIMITS, limiter
+from utils.sanitiser import _COMMON_PASSWORDS, sanitise_email
 
 logger = logging.getLogger(__name__)
 
@@ -21,19 +22,31 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return sanitise_email(v)
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
         if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
+            raise ValueError("Password must be at least 8 characters.")
         if len(v.encode("utf-8")) > 72:
-            raise ValueError("Password must be 72 characters or fewer")
+            raise ValueError("Password must be 72 characters or fewer.")
+        if v.lower() in _COMMON_PASSWORDS:
+            raise ValueError("This password is too common. Please choose a stronger password.")
         return v
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return sanitise_email(v)
 
 
 class AuthResponse(BaseModel):

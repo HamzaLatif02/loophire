@@ -25,7 +25,7 @@ export default function LoginPage() {
       setToken(res.data.access_token)
       navigate('/apply')
     } catch (err) {
-      setError(err.response?.data?.detail ?? err.response?.data?.error ?? 'Login failed — please try again.')
+      setError(err.userMessage ?? err.response?.data?.detail ?? 'Login failed — please try again.')
     } finally {
       setLoading(false)
     }
