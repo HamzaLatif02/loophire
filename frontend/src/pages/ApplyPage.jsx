@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import ErrorBanner from '../components/ErrorBanner'
 import GenerationProgress from '../components/GenerationProgress'
 import Spinner from '../components/Spinner'
+import { useInvalidateApplications } from '../hooks/useApplications'
 import { useGenerationProgress } from '../hooks/useGenerationProgress'
 import api from '../utils/api'
 
@@ -22,6 +23,14 @@ export default function ApplyPage() {
 
   const { progress, isComplete, wsError, applicationId, connect, reset } = useGenerationProgress()
   const [isGenerating, setIsGenerating] = useState(false)
+  const invalidateApplications = useInvalidateApplications()
+
+  // Invalidate dashboard cache when generation completes so the new
+  // application appears instantly when the user lands back on the dashboard.
+  // Navigation is handled by GenerationProgress (with its 1200ms delay).
+  useEffect(() => {
+    if (isComplete) invalidateApplications()
+  }, [isComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── form ────────────────────────────────────────────────────────────────────
   const [form, setForm]         = useState({ job_title: '', company_name: '', job_description: '' })

@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { formatDistanceToNow } from 'date-fns'
+import {
+  Bar, BarChart, CartesianGrid, Cell,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts'
 import ErrorBanner from '../components/ErrorBanner'
-import Spinner from '../components/Spinner'
+import {
+  ChartSkeleton, InsightsSkeleton, InterviewsSkeleton, StatsSkeleton, TableSkeleton,
+} from '../components/skeletons/DashboardSkeleton'
+import { useAnalytics, useApplications } from '../hooks/useApplications'
 
 function formatInterviewDate(isoStr) {
   return new Date(isoStr).toLocaleString('en-GB', {
@@ -10,11 +18,6 @@ function formatInterviewDate(isoStr) {
     timeZone: 'UTC',
   })
 }
-import {
-  Bar, BarChart, CartesianGrid, Cell,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
-import api from '../utils/api'
 
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -40,30 +43,23 @@ function fitColor(score) {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [apps, setApps]         = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState('')
-  const [analytics, setAnalytics] = useState(null)
+
+  const {
+    data: apps = [],
+    isLoading: appsLoading,
+    error: appsError,
+    dataUpdatedAt,
+  } = useApplications()
+
+  const {
+    data: analytics,
+    isLoading: analyticsLoading,
+  } = useAnalytics()
 
   // filter + sort state
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortField, setSortField]       = useState('created_at')
   const [sortDir, setSortDir]           = useState('desc')
-
-  useEffect(() => {
-    api.get('/applications')
-      .then((r) => setApps(r.data))
-      .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Failed to load applications.'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => {
-    api.get('/applications/analytics')
-      .then((r) => setAnalytics(r.data))
-      .catch(() => {})
-  }, [])
-
-  // ── derived stats ────────────────────────────────────────────────────────────
 
   const stats = useMemo(() => {
     const scored = apps.filter((a) => a.fit_score != null)
@@ -76,7 +72,6 @@ export default function DashboardPage() {
     return { total: apps.length, avg, byStatus }
   }, [apps])
 
-  // chart: last 10 apps that have a fit score, in chronological order
   const chartData = useMemo(() => {
     return [...apps]
       .filter((a) => a.fit_score != null)
@@ -89,8 +84,6 @@ export default function DashboardPage() {
       }))
   }, [apps])
 
-  // ── upcoming interviews ──────────────────────────────────────────────────────
-
   const upcomingInterviews = useMemo(() => {
     const now = Date.now()
     return apps
@@ -99,20 +92,16 @@ export default function DashboardPage() {
       .slice(0, 3)
   }, [apps])
 
-  // ── filtered + sorted rows ───────────────────────────────────────────────────
-
   const rows = useMemo(() => {
     let list = statusFilter === 'all'
       ? [...apps]
       : apps.filter((a) => a.status === statusFilter)
-
     list.sort((a, b) => {
       if (sortField === 'fit_score') {
         const av = a.fit_score ?? -1
         const bv = b.fit_score ?? -1
         return sortDir === 'asc' ? av - bv : bv - av
       }
-      // created_at
       const av = new Date(a.created_at).getTime()
       const bv = new Date(b.created_at).getTime()
       return sortDir === 'asc' ? av - bv : bv - av
@@ -129,22 +118,12 @@ export default function DashboardPage() {
     }
   }
 
-  // ── loading ──────────────────────────────────────────────────────────────────
+  // ── empty state (only after first successful load) ───────────────────────────
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-32 gap-3 text-[var(--color-muted)] text-sm">
-        <Spinner size={18} /> Loading applications…
-      </div>
-    )
-  }
-
-  // ── empty state ──────────────────────────────────────────────────────────────
-
-  if (!error && apps.length === 0) {
+  if (!appsLoading && !appsError && apps.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader navigate={navigate} />
+        <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} />
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-24 text-center space-y-4">
           <p className="text-4xl">📭</p>
           <p className="font-semibold text-[var(--color-text)]">No applications yet</p>
@@ -167,182 +146,192 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
 
-      <PageHeader navigate={navigate} />
+      <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} />
 
-      <ErrorBanner message={error} onDismiss={() => setError('')} />
+      {appsError && (
+        <ErrorBanner message={appsError.response?.data?.error ?? appsError.response?.data?.detail ?? 'Failed to load applications.'} />
+      )}
 
       {/* ── upcoming interviews ── */}
-      <UpcomingInterviewsCard interviews={upcomingInterviews} navigate={navigate} />
+      {appsLoading
+        ? <InterviewsSkeleton />
+        : <UpcomingInterviewsCard interviews={upcomingInterviews} navigate={navigate} />
+      }
 
       {/* ── stats bar ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="Total" value={stats.total} />
-        <StatCard
-          label="Avg Fit Score"
-          value={stats.avg != null ? stats.avg : '—'}
-          valueColor={stats.avg != null ? fitColor(stats.avg) : undefined}
-        />
-        <StatCard label="Applied"      value={stats.byStatus.applied}      accent="blue" />
-        <StatCard label="Interviewing" value={stats.byStatus.interviewing} accent="orange" />
-        <StatCard label="Offers"       value={stats.byStatus.offer}        accent="green" />
-        <StatCard label="Rejected"     value={stats.byStatus.rejected}     accent="red" />
-      </div>
+      {appsLoading
+        ? <StatsSkeleton />
+        : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <StatCard label="Total" value={stats.total} />
+            <StatCard
+              label="Avg Fit Score"
+              value={stats.avg != null ? stats.avg : '—'}
+              valueColor={stats.avg != null ? fitColor(stats.avg) : undefined}
+            />
+            <StatCard label="Applied"      value={stats.byStatus.applied}      accent="blue" />
+            <StatCard label="Interviewing" value={stats.byStatus.interviewing} accent="orange" />
+            <StatCard label="Offers"       value={stats.byStatus.offer}        accent="green" />
+            <StatCard label="Rejected"     value={stats.byStatus.rejected}     accent="red" />
+          </div>
+        )
+      }
 
       {/* ── A/B insights ── */}
-      {analytics && analytics.total_applications > 0 && (
-        <ABInsightsSection analytics={analytics} />
-      )}
+      {analyticsLoading
+        ? <InsightsSkeleton />
+        : analytics && analytics.total_applications > 0
+          ? <ABInsightsSection analytics={analytics} />
+          : null
+      }
 
       {/* ── chart ── */}
-      {chartData.length > 0 && (
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--color-border)]">
-            <h2 className="text-sm font-semibold text-[var(--color-text)]">Fit Scores</h2>
-            <p className="text-xs text-[var(--color-muted)] mt-0.5">Last {chartData.length} scored applications</p>
+      {appsLoading
+        ? <ChartSkeleton />
+        : chartData.length > 0 && (
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--color-border)]">
+              <h2 className="text-sm font-semibold text-[var(--color-text)]">Fit Scores</h2>
+              <p className="text-xs text-[var(--color-muted)] mt-0.5">Last {chartData.length} scored applications</p>
+            </div>
+            <div className="p-5 h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} barCategoryGap="30%">
+                  <CartesianGrid
+                    vertical={false}
+                    stroke="var(--color-border)"
+                    strokeDasharray="3 3"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 25, 50, 75, 100]}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={28}
+                  />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
+                  <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                    {chartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} fillOpacity={0.85} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="p-5 h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barCategoryGap="30%">
-                <CartesianGrid
-                  vertical={false}
-                  stroke="var(--color-border)"
-                  strokeDasharray="3 3"
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  ticks={[0, 25, 50, 75, 100]}
-                  tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={28}
-                />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
-                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} fillOpacity={0.85} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+        )
+      }
 
       {/* ── table controls ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-sm text-[var(--color-muted)]">
-          {rows.length} of {apps.length} application{apps.length !== 1 ? 's' : ''}
-          {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
-        </p>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-[var(--color-muted)]">Status</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-colors cursor-pointer"
-          >
-            <option value="all">All</option>
-            {ALL_STATUSES.map((s) => (
-              <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* ── table ── */}
-      {rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[var(--color-border)] py-12 text-center">
+      {!appsLoading && apps.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-sm text-[var(--color-muted)]">
-            No applications with status "{statusFilter}".
+            {rows.length} of {apps.length} application{apps.length !== 1 ? 's' : ''}
+            {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
           </p>
-          <button
-            onClick={() => setStatusFilter('all')}
-            className="mt-3 text-xs text-[var(--color-accent)] hover:underline"
-          >
-            Clear filter
-          </button>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--color-border)]">
-                <Th>Company</Th>
-                <Th>Job Title</Th>
-                <SortTh
-                  label="Fit Score"
-                  field="fit_score"
-                  active={sortField}
-                  dir={sortDir}
-                  onSort={toggleSort}
-                />
-                <Th>Status</Th>
-                <SortTh
-                  label="Date"
-                  field="created_at"
-                  active={sortField}
-                  dir={sortDir}
-                  onSort={toggleSort}
-                />
-                <Th align="right">Actions</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((app, i) => (
-                <tr
-                  key={app.id}
-                  className={`hover:bg-[var(--color-surface-2)] transition-colors ${
-                    i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
-                  }`}
-                >
-                  <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px] truncate">
-                    {app.company_name}
-                  </td>
-                  <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
-                    {app.job_title}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    {app.fit_score != null ? (
-                      <span
-                        className="text-sm font-semibold tabular-nums"
-                        style={{ color: fitColor(app.fit_score) }}
-                      >
-                        {Math.round(app.fit_score)}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--color-muted)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
-                      {app.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
-                    {new Date(app.created_at).toLocaleDateString('en-GB', {
-                      day: 'numeric', month: 'short', year: 'numeric',
-                    })}
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      onClick={() => navigate(`/applications/${app.id}`)}
-                      className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
-                    >
-                      View →
-                    </button>
-                  </td>
-                </tr>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-[var(--color-muted)]">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] transition-colors cursor-pointer"
+            >
+              <option value="all">All</option>
+              {ALL_STATUSES.map((s) => (
+                <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
-            </tbody>
-          </table>
+            </select>
+          </div>
         </div>
       )}
+
+      {/* ── table ── */}
+      {appsLoading
+        ? <TableSkeleton rows={5} />
+        : rows.length === 0 && apps.length > 0
+          ? (
+            <div className="rounded-xl border border-dashed border-[var(--color-border)] py-12 text-center">
+              <p className="text-sm text-[var(--color-muted)]">
+                No applications with status "{statusFilter}".
+              </p>
+              <button
+                onClick={() => setStatusFilter('all')}
+                className="mt-3 text-xs text-[var(--color-accent)] hover:underline"
+              >
+                Clear filter
+              </button>
+            </div>
+          )
+          : apps.length > 0
+            ? (
+              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--color-border)]">
+                      <Th>Company</Th>
+                      <Th>Job Title</Th>
+                      <SortTh label="Fit Score" field="fit_score" active={sortField} dir={sortDir} onSort={toggleSort} />
+                      <Th>Status</Th>
+                      <SortTh label="Date" field="created_at" active={sortField} dir={sortDir} onSort={toggleSort} />
+                      <Th align="right">Actions</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((app, i) => (
+                      <tr
+                        key={app.id}
+                        className={`hover:bg-[var(--color-surface-2)] transition-colors ${
+                          i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
+                        }`}
+                      >
+                        <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px] truncate">
+                          {app.company_name}
+                        </td>
+                        <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
+                          {app.job_title}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {app.fit_score != null ? (
+                            <span className="text-sm font-semibold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
+                              {Math.round(app.fit_score)}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--color-muted)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
+                            {app.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
+                          {new Date(app.created_at).toLocaleDateString('en-GB', {
+                            day: 'numeric', month: 'short', year: 'numeric',
+                          })}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <button
+                            onClick={() => navigate(`/applications/${app.id}`)}
+                            className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                          >
+                            View →
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+            : null
+      }
 
     </div>
   )
@@ -350,12 +339,17 @@ export default function DashboardPage() {
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-function PageHeader({ navigate }) {
+function PageHeader({ navigate, dataUpdatedAt }) {
   return (
     <div className="flex items-center justify-between">
       <div>
         <h1 className="text-2xl font-bold text-[var(--color-text)]">Dashboard</h1>
         <p className="text-sm text-[var(--color-muted)] mt-1">Track and manage your applications</p>
+        {dataUpdatedAt > 0 && (
+          <p className="text-xs text-[var(--color-border)] mt-0.5">
+            Updated {formatDistanceToNow(new Date(dataUpdatedAt))} ago
+          </p>
+        )}
       </div>
       <button
         onClick={() => navigate('/apply')}

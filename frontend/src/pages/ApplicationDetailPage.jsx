@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import CVEditor from '../components/CVEditor'
 import EditableTextArea from '../components/EditableTextArea'
 import ErrorBanner from '../components/ErrorBanner'
 import GenerationProgress from '../components/GenerationProgress'
+import { ApplicationDetailSkeleton } from '../components/skeletons/ApplicationDetailSkeleton'
 import Spinner from '../components/Spinner'
+import { KEYS, useApplication, useUpdateApplication, useUpdateStatus } from '../hooks/useApplications'
 import { useGenerationProgress } from '../hooks/useGenerationProgress'
 import api from '../utils/api'
 
@@ -74,11 +77,13 @@ function toDatetimeLocal(isoStr) {
 export default function ApplicationDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [app, setApp]                       = useState(null)
-  const [loading, setLoading]               = useState(true)
-  const [error, setError]                   = useState('')
+  const queryClient = useQueryClient()
+
+  const { data: app, isLoading: loading, error: fetchError } = useApplication(id)
+  const updateApplication = useUpdateApplication()
+  const updateStatus = useUpdateStatus()
+
   const [activeTab, setActiveTab]           = useState(0)
-  const [savingStatus, setSaving]           = useState(false)
   const [statusOpen, setStatusOpen]         = useState(false)
   const [interviewDate, setInterviewDate]   = useState('')
   const [interviewNotes, setInterviewNotes] = useState('')
@@ -102,13 +107,6 @@ export default function ApplicationDetailPage() {
     reset: regenReset,
   } = useGenerationProgress()
 
-  useEffect(() => {
-    api.get(`/applications/${id}`)
-      .then((r) => setApp(r.data))
-      .catch((err) => setError(err.response?.data?.error ?? err.response?.data?.detail ?? 'Application not found.'))
-      .finally(() => setLoading(false))
-  }, [id])
-
   // Sync interview + response fields once when the application first loads
   useEffect(() => {
     if (!app) return
@@ -131,16 +129,9 @@ export default function ApplicationDetailPage() {
 
   useEffect(() => {
     if (!regenComplete) return
-    api.get(`/applications/${id}`)
-      .then((r) => {
-        setApp(r.data)
-        setIsRegenerating(false)
-        regenReset()
-      })
-      .catch(() => {
-        setIsRegenerating(false)
-        regenReset()
-      })
+    queryClient.invalidateQueries({ queryKey: KEYS.application(id) })
+    setIsRegenerating(false)
+    regenReset()
   }, [regenComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function startRegeneration() {
@@ -156,19 +147,18 @@ export default function ApplicationDetailPage() {
   }
 
   async function patchApplication(fields) {
-    const r = await api.patch(`/applications/${id}`, fields)
-    setApp(r.data)
+    await updateApplication.mutateAsync({ id: Number(id), ...fields })
   }
 
   async function saveInterview() {
     if (savingInterview) return
     setSavingInterview(true)
     try {
-      const r = await api.patch(`/applications/${id}/interview`, {
+      await api.patch(`/applications/${id}/interview`, {
         interview_date: interviewDate || null,
         interview_notes: interviewNotes || null,
       })
-      setApp(r.data)
+      queryClient.invalidateQueries({ queryKey: KEYS.application(id) })
       setInterviewSaved(true)
       setTimeout(() => setInterviewSaved(false), 2000)
     } catch { /* non-critical */ } finally {
@@ -180,11 +170,11 @@ export default function ApplicationDetailPage() {
     if (savingResponse) return
     setSavingResponse(true)
     try {
-      const r = await api.patch(`/applications/${id}/response`, {
+      await api.patch(`/applications/${id}/response`, {
         got_response: newGotResponse,
         response_type: newGotResponse ? (newResponseType || null) : null,
       })
-      setApp(r.data)
+      queryClient.invalidateQueries({ queryKey: KEYS.application(id) })
       setResponseSaved(true)
       setTimeout(() => setResponseSaved(false), 2000)
     } catch { /* non-critical */ } finally {
@@ -197,8 +187,8 @@ export default function ApplicationDetailPage() {
     setGeneratingPrep(true)
     setPrepError('')
     try {
-      const r = await api.post(`/applications/${id}/interview-prep`)
-      setApp(r.data)
+      await api.post(`/applications/${id}/interview-prep`)
+      queryClient.invalidateQueries({ queryKey: KEYS.application(id) })
     } catch (err) {
       setPrepError(err.response?.data?.detail ?? 'Failed to generate interview questions.')
     } finally {
@@ -207,32 +197,22 @@ export default function ApplicationDetailPage() {
   }
 
   async function changeStatus(status) {
-    if (savingStatus || status === app.status) { setStatusOpen(false); return }
-    setSaving(true)
+    if (updateStatus.isPending || status === app.status) { setStatusOpen(false); return }
     setStatusOpen(false)
     try {
-      const r = await api.patch(`/applications/${id}/status`, { status })
-      setApp(r.data)
-    } catch { /* non-critical */ } finally {
-      setSaving(false)
-    }
+      await updateStatus.mutateAsync({ id: Number(id), status })
+    } catch { /* non-critical */ }
   }
 
   // ── loading / error ─────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 gap-3">
-        <Spinner size={24} />
-        <p className="text-sm text-[var(--color-muted)]">Loading application…</p>
-      </div>
-    )
-  }
+  if (loading) return <ApplicationDetailSkeleton />
 
-  if (error || !app) {
+  if (fetchError || !app) {
+    const errMsg = fetchError?.response?.data?.error ?? fetchError?.response?.data?.detail ?? 'Application not found.'
     return (
       <div className="py-32 max-w-md mx-auto space-y-4">
-        <ErrorBanner message={error || 'Application not found.'} />
+        <ErrorBanner message={errMsg} />
         <button
           onClick={() => navigate('/applications')}
           className="text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
@@ -349,10 +329,10 @@ export default function ApplicationDetailPage() {
             <div className="relative">
               <button
                 onClick={() => setStatusOpen((o) => !o)}
-                disabled={savingStatus}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border capitalize transition-colors ${statusStyle.pill} ${savingStatus ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                disabled={updateStatus.isPending}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border capitalize transition-colors ${statusStyle.pill} ${updateStatus.isPending ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                {savingStatus ? (
+                {updateStatus.isPending ? (
                   <Spinner size={12} />
                 ) : (
                   <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
