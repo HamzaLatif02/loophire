@@ -40,24 +40,45 @@ async function showLoggedIn(token) {
     }
 }
 
+function isLinkedInJobPage(url) {
+    if (!url) return false
+    try {
+        const parsed = new URL(url)
+        if (!parsed.hostname.includes("linkedin.com")) return false
+        if (parsed.pathname.includes("/jobs/view/")) return true
+        if (parsed.pathname.includes("/jobs/search") &&
+            parsed.searchParams.get("currentJobId")) return true
+        if (parsed.pathname.includes("/jobs/") &&
+            parsed.searchParams.get("currentJobId")) return true
+        return false
+    } catch {
+        return false
+    }
+}
+
+const LOADING_HINT = `
+    <p class="hint">
+        Job page detected but still loading.<br/>
+        Wait a moment and reopen the extension.
+    </p>
+    <div class="divider"></div>
+`
+
 async function checkCurrentTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-
-    const isLinkedInJob =
-        tab?.url?.includes("linkedin.com/jobs/view") ||
-        (tab?.url?.includes("linkedin.com/jobs/") &&
-         tab?.url?.includes("currentJobId"))
 
     const importSection = document.getElementById("import-section")
     const notJobPage    = document.getElementById("not-job-page")
 
-    if (!isLinkedInJob) {
+    if (!tab?.url || !isLinkedInJobPage(tab.url)) {
         notJobPage.classList.remove("hidden")
         importSection.classList.add("hidden")
         return
     }
 
-    // Ask the content script for the current job data
+    // Give LinkedIn's async renderer time to paint the job panel
+    await new Promise(resolve => setTimeout(resolve, 800))
+
     try {
         const response = await chrome.tabs.sendMessage(tab.id, {
             type: "GET_JOB_DATA"
@@ -66,19 +87,19 @@ async function checkCurrentTab() {
         if (response?.job_title) {
             importSection.classList.remove("hidden")
             notJobPage.classList.add("hidden")
-
             document.getElementById("job-preview").innerHTML =
                 `<div class="title">${escapeHtml(response.job_title)}</div>` +
                 `<div class="company">${escapeHtml(response.company_name)}</div>`
-
             window._jobData = response
         } else {
             notJobPage.classList.remove("hidden")
+            notJobPage.innerHTML = LOADING_HINT
             importSection.classList.add("hidden")
         }
     } catch {
-        // Content script not yet ready (page still loading)
+        // Content script not yet injected — page still loading
         notJobPage.classList.remove("hidden")
+        notJobPage.innerHTML = LOADING_HINT
         importSection.classList.add("hidden")
     }
 }

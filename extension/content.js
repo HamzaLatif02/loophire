@@ -53,12 +53,18 @@ function extractJobData() {
     const companyEl     = trySelectors(SELECTORS.companyName)
     const descriptionEl = trySelectors(SELECTORS.jobDescription)
 
-    return {
-        job_title:       titleEl?.innerText?.trim()       || "",
-        company_name:    companyEl?.innerText?.trim()     || "",
-        job_description: descriptionEl?.innerText?.trim() || "",
-        url:             window.location.href,
-    }
+    const job_title       = titleEl?.innerText?.trim()       || ""
+    const company_name    = companyEl?.innerText?.trim()     || ""
+    const job_description = descriptionEl?.innerText?.trim() || ""
+
+    console.log("Loophire extractJobData:", {
+        job_title,
+        company_name,
+        description_length: job_description.length,
+        url: window.location.href,
+    })
+
+    return { job_title, company_name, job_description, url: window.location.href }
 }
 
 function isJobDetailPage() {
