@@ -32,6 +32,7 @@ from schemas.application import (
     ApplicationStatusUpdate,
     ApplicationSummary,
     InterviewUpdateRequest,
+    NotesUpdateRequest,
     ResponseUpdateRequest,
     ScrapeJobRequest,
 )
@@ -540,6 +541,21 @@ def update_interview(
     db.commit()
     db.refresh(application)
     return application
+
+
+@router.patch("/{application_id}/notes")
+@limiter.limit(LIMITS["app_notes"])
+def update_notes(
+    request: Request,
+    application_id: int,
+    body: NotesUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    application = _get_application(application_id, current_user.id, db)
+    application.notes = body.notes
+    db.commit()
+    return {"id": application.id, "notes": application.notes}
 
 
 @router.patch("/{application_id}/response", response_model=ApplicationDetail)

@@ -5,6 +5,7 @@ import CVEditor from '../components/CVEditor'
 import EditableTextArea from '../components/EditableTextArea'
 import ErrorBanner from '../components/ErrorBanner'
 import GenerationProgress from '../components/GenerationProgress'
+import NotesEditor from '../components/NotesEditor'
 import { ApplicationDetailSkeleton } from '../components/skeletons/ApplicationDetailSkeleton'
 import Spinner from '../components/Spinner'
 import { KEYS, useApplication, useUpdateApplication, useUpdateStatus } from '../hooks/useApplications'
@@ -14,7 +15,7 @@ import api from '../utils/api'
 
 // ─── constants ───────────────────────────────────────────────────────────────
 
-const TABS = ['Tailored CV', 'Cover Letter', 'Analysis', 'Interview Prep']
+const TABS = ['Tailored CV', 'Cover Letter', 'Analysis', 'Interview Prep', 'Notes']
 
 const RESPONSE_TYPE_OPTIONS = [
   'recruiter screen',
@@ -308,6 +309,14 @@ export default function ApplicationDetailPage() {
                 </span>
               )}
             </p>
+            {app.notes && (
+              <p
+                className="text-xs text-[var(--color-muted)] mt-1.5 truncate max-w-sm"
+                title={app.notes}
+              >
+                📝 {app.notes.split('\n')[0]}
+              </p>
+            )}
           </div>
 
           {/* regenerate button */}
@@ -468,13 +477,16 @@ export default function ApplicationDetailPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(i)}
-                className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                   activeTab === i
                     ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
                     : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]'
                 }`}
               >
                 {tab}
+                {tab === 'Notes' && app.notes && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
+                )}
               </button>
             ))}
           </div>
@@ -507,6 +519,11 @@ export default function ApplicationDetailPage() {
             generating={generatingPrep}
             error={prepError}
           />
+        )}
+        {activeTab === 4 && (
+          <div className="py-4">
+            <NotesEditor applicationId={id} initialNotes={app.notes} />
+          </div>
         )}
       </div>
 

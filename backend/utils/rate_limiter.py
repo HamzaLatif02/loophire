@@ -32,6 +32,7 @@ LIMITS = {
     "app_list":           "60/minute",
     "app_detail":         "60/minute",
     "app_update":         "30/minute",
+    "app_notes":          "60/minute",
     "app_export_pdf":     "20/hour",
     "app_interview_prep": "10/hour",
     "app_scrape_job":     "30/hour",

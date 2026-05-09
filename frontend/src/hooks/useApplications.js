@@ -63,6 +63,25 @@ export function useUpdateApplication() {
   })
 }
 
+export function useUpdateNotes() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, notes }) =>
+      api.patch(`/applications/${id}/notes`, { notes }),
+    onMutate: async ({ id, notes }) => {
+      await queryClient.cancelQueries({ queryKey: KEYS.application(id) })
+      const previous = queryClient.getQueryData(KEYS.application(id))
+      queryClient.setQueryData(KEYS.application(id), (old) => old ? { ...old, notes } : old)
+      return { previous }
+    },
+    onError: (_, { id }, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(KEYS.application(id), context.previous)
+      }
+    },
+  })
+}
+
 export function useInvalidateApplications() {
   const queryClient = useQueryClient()
   return () => {

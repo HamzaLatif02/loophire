@@ -64,6 +64,7 @@ class ApplicationSummary(BaseModel):
     interview_date: Optional[datetime] = None
     got_response: bool = False
     response_type: Optional[str] = None
+    notes: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -137,6 +138,15 @@ class ResponseUpdateRequest(BaseModel):
         if v not in RESPONSE_TYPES:
             raise ValueError(f"Response type must be one of: {', '.join(RESPONSE_TYPES)}")
         return v
+
+
+class NotesUpdateRequest(BaseModel):
+    notes: str
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, v: str) -> str:
+        return sanitise_text(v, "notes")
 
 
 class AnalyticsResponse(BaseModel):

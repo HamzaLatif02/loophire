@@ -291,8 +291,13 @@ export default function DashboardPage() {
                           i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
                         }`}
                       >
-                        <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px] truncate">
-                          {app.company_name}
+                        <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px]">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="truncate">{app.company_name}</span>
+                            {app.notes && (
+                              <span title={app.notes.split('\n')[0]} className="shrink-0 text-[var(--color-muted)] text-xs leading-none">📝</span>
+                            )}
+                          </span>
                         </td>
                         <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
                           {app.job_title}
