@@ -69,20 +69,20 @@ export default function GenerationProgress({ progress, isComplete, error, applic
         </div>
 
         {/* Stage checklist */}
-        <div className="flex items-center gap-2 flex-wrap justify-center">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center px-2">
           {STAGE_ORDER.map((key, idx) => {
             const isDone    = isComplete || idx < currentIdx
             const isCurrent = !isComplete && key === progress.stage
             return (
-              <div key={key} className="flex items-center gap-1.5">
-                <span className={`text-xs transition-colors duration-300 ${
+              <div key={key} className="flex items-center gap-1 sm:gap-1.5">
+                <span className={`text-[10px] sm:text-xs transition-colors duration-300 ${
                   isDone    ? 'text-[var(--color-success)]'
                   : isCurrent ? 'text-[var(--color-accent)]'
                   : 'text-[var(--color-border)]'
                 }`}>
                   {isDone ? '✓' : isCurrent ? '→' : '○'}
                 </span>
-                <span className={`text-xs transition-colors duration-300 hidden sm:inline ${
+                <span className={`text-[10px] sm:text-xs transition-colors duration-300 hidden sm:inline ${
                   isDone    ? 'text-[var(--color-success)]'
                   : isCurrent ? 'text-[var(--color-text)] font-medium'
                   : 'text-[var(--color-border)]'
@@ -90,7 +90,7 @@ export default function GenerationProgress({ progress, isComplete, error, applic
                   {STAGES[key]?.label ?? key}
                 </span>
                 {idx < STAGE_ORDER.length - 1 && (
-                  <span className="text-[var(--color-border)] text-xs hidden sm:inline">›</span>
+                  <span className="text-[var(--color-border)] text-[10px] sm:text-xs hidden sm:inline">›</span>
                 )}
               </div>
             )

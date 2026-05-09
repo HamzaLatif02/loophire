@@ -552,14 +552,14 @@ function SearchJobsTab({
   return (
     <div className="space-y-4">
       {/* inputs */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <input
           type="text"
           value={keywords}
           onChange={e => setKeywords(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
           placeholder="Enter a job title"
-          className={`${inputCls} col-span-2`}
+          className={`${inputCls} sm:col-span-2`}
         />
         <input
           type="text"
@@ -567,19 +567,19 @@ function SearchJobsTab({
           onChange={e => setLocation(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
           placeholder="Enter a location"
-          className={inputCls}
+          className={`${inputCls} sm:col-span-1`}
         />
       </div>
 
       {/* source toggle + search */}
       <div className="flex items-center gap-3">
-        <div className="flex rounded-lg border border-[var(--color-border)] overflow-hidden text-xs font-medium">
+        <div className="grid grid-cols-3 flex-1 sm:flex-none sm:w-auto rounded-lg border border-[var(--color-border)] overflow-hidden text-xs font-medium">
           {SOURCES.map(s => (
             <button
               key={s}
               type="button"
               onClick={() => setSource(s)}
-              className={`px-3 py-1.5 capitalize transition-colors ${
+              className={`px-3 py-2 capitalize transition-colors ${
                 source === s
                   ? 'bg-[var(--color-accent)] text-white'
                   : 'bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
@@ -593,7 +593,7 @@ function SearchJobsTab({
           type="button"
           onClick={onSearch}
           disabled={searching || !keywords.trim()}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
         >
           {searching ? <><Spinner size={13} /> Searching…</> : 'Search'}
         </button>
@@ -660,7 +660,7 @@ function JobCard({ job, importing, onImport }) {
           </p>
         )}
       </div>
-      <div className="shrink-0 flex flex-col gap-1.5">
+      <div className="shrink-0 flex flex-row sm:flex-col gap-1.5 self-end sm:self-auto">
         <button
           type="button"
           onClick={() => onImport(job)}

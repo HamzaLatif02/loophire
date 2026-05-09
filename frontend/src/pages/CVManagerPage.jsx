@@ -114,7 +114,7 @@ export default function CVManagerPage() {
             className={inputCls}
             disabled={uploading}
           />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <label className="flex-1 cursor-pointer">
               <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-dashed text-sm transition-colors ${
                 file
@@ -175,7 +175,7 @@ export default function CVManagerPage() {
             {versions.map(cv => (
               <li
                 key={cv.id}
-                className={`flex items-center gap-4 p-4 rounded-xl border transition-colors ${
+                className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl border transition-colors ${
                   cv.is_default
                     ? 'border-[var(--color-accent)]/50 bg-[var(--color-accent)]/5'
                     : 'border-[var(--color-border)] bg-[var(--color-surface)]'
@@ -206,12 +206,12 @@ export default function CVManagerPage() {
                 </div>
 
                 {/* actions */}
-                <div className="shrink-0 flex items-center gap-2">
+                <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   {!cv.is_default && (
                     <button
                       type="button"
                       onClick={() => handleSetDefault(cv.id)}
-                      className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors"
+                      className="text-xs px-3 py-2 sm:py-1.5 rounded-md border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)] transition-colors w-full sm:w-auto"
                     >
                       Set default
                     </button>
@@ -219,7 +219,7 @@ export default function CVManagerPage() {
                   <button
                     type="button"
                     onClick={() => handleDelete(cv.id, cv.name)}
-                    className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)] transition-colors"
+                    className="text-xs px-3 py-2 sm:py-1.5 rounded-md border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)] transition-colors w-full sm:w-auto"
                   >
                     Delete
                   </button>

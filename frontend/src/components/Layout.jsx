@@ -6,7 +6,7 @@ export default function Layout() {
     <div className="min-h-screen flex flex-col bg-[var(--color-bg)]">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-6xl mx-auto px-6 py-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
           <Outlet />
         </div>
       </main>

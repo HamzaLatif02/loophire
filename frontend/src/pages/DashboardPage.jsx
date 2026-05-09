@@ -194,36 +194,38 @@ export default function DashboardPage() {
               <h2 className="text-sm font-semibold text-[var(--color-text)]">Fit Scores</h2>
               <p className="text-xs text-[var(--color-muted)] mt-0.5">Last {chartData.length} scored applications</p>
             </div>
-            <div className="p-5 h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} barCategoryGap="30%">
-                  <CartesianGrid
-                    vertical={false}
-                    stroke="var(--color-border)"
-                    strokeDasharray="3 3"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    ticks={[0, 25, 50, 75, 100]}
-                    tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={28}
-                  />
-                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} fillOpacity={0.85} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="p-5 overflow-x-auto">
+              <div className="min-w-[480px] h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} barCategoryGap="30%">
+                    <CartesianGrid
+                      vertical={false}
+                      stroke="var(--color-border)"
+                      strokeDasharray="3 3"
+                    />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      ticks={[0, 25, 50, 75, 100]}
+                      tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={28}
+                    />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
+                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                      {chartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} fillOpacity={0.85} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         )
@@ -271,69 +273,113 @@ export default function DashboardPage() {
           )
           : apps.length > 0
             ? (
-              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--color-border)]">
-                      <Th>Company</Th>
-                      <Th>Job Title</Th>
-                      <SortTh label="Fit Score" field="fit_score" active={sortField} dir={sortDir} onSort={toggleSort} />
-                      <Th>Status</Th>
-                      <SortTh label="Date" field="created_at" active={sortField} dir={sortDir} onSort={toggleSort} />
-                      <Th align="right">Actions</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((app, i) => (
-                      <tr
-                        key={app.id}
-                        className={`hover:bg-[var(--color-surface-2)] transition-colors ${
-                          i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
-                        }`}
-                      >
-                        <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px]">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="truncate">{app.company_name}</span>
+              <>
+                {/* ── Mobile card layout ── */}
+                <div className="md:hidden flex flex-col gap-3">
+                  {rows.map((app) => (
+                    <div
+                      key={app.id}
+                      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 flex flex-col gap-2.5"
+                    >
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[var(--color-text)] truncate flex items-center gap-1.5">
+                            {app.company_name}
                             {app.notes && (
-                              <span title={app.notes.split('\n')[0]} className="shrink-0 text-[var(--color-muted)] text-xs leading-none">📝</span>
+                              <span title={app.notes.split('\n')[0]} className="text-xs text-[var(--color-muted)] shrink-0">📝</span>
                             )}
+                          </p>
+                          <p className="text-sm text-[var(--color-muted)] truncate mt-0.5">{app.job_title}</p>
+                        </div>
+                        {app.fit_score != null && (
+                          <span className="shrink-0 text-sm font-bold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
+                            {Math.round(app.fit_score)}
                           </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
-                          {app.job_title}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {app.fit_score != null ? (
-                            <span className="text-sm font-semibold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
-                              {Math.round(app.fit_score)}
-                            </span>
-                          ) : (
-                            <span className="text-[var(--color-muted)]">—</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
-                            {app.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
-                          {new Date(app.created_at).toLocaleDateString('en-GB', {
-                            day: 'numeric', month: 'short', year: 'numeric',
-                          })}
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <button
-                            onClick={() => navigate(`/applications/${app.id}`)}
-                            className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
-                          >
-                            View →
-                          </button>
-                        </td>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
+                          {app.status}
+                        </span>
+                        <span className="text-xs text-[var(--color-muted)] tabular-nums">
+                          {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/applications/${app.id}`)}
+                        className="w-full py-2 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                      >
+                        View →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Desktop table layout ── */}
+                <div className="hidden md:block rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--color-border)]">
+                        <Th>Company</Th>
+                        <Th>Job Title</Th>
+                        <SortTh label="Fit Score" field="fit_score" active={sortField} dir={sortDir} onSort={toggleSort} />
+                        <Th>Status</Th>
+                        <SortTh label="Date" field="created_at" active={sortField} dir={sortDir} onSort={toggleSort} />
+                        <Th align="right">Actions</Th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {rows.map((app, i) => (
+                        <tr
+                          key={app.id}
+                          className={`hover:bg-[var(--color-surface-2)] transition-colors ${
+                            i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
+                          }`}
+                        >
+                          <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px]">
+                            <span className="flex items-center gap-1.5 truncate">
+                              <span className="truncate">{app.company_name}</span>
+                              {app.notes && (
+                                <span title={app.notes.split('\n')[0]} className="shrink-0 text-[var(--color-muted)] text-xs leading-none">📝</span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
+                            {app.job_title}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            {app.fit_score != null ? (
+                              <span className="text-sm font-semibold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
+                                {Math.round(app.fit_score)}
+                              </span>
+                            ) : (
+                              <span className="text-[var(--color-muted)]">—</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
+                              {app.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
+                            {new Date(app.created_at).toLocaleDateString('en-GB', {
+                              day: 'numeric', month: 'short', year: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <button
+                              onClick={() => navigate(`/applications/${app.id}`)}
+                              className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                            >
+                              View →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )
             : null
       }
@@ -358,9 +404,9 @@ function PageHeader({ navigate, dataUpdatedAt }) {
       </div>
       <button
         onClick={() => navigate('/apply')}
-        className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
+        className="shrink-0 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
       >
-        + New Application
+        + New
       </button>
     </div>
   )
@@ -441,7 +487,7 @@ function ABInsightsSection({ analytics }) {
         <p className="text-xs text-[var(--color-muted)] mt-0.5">CV performance across your applications</p>
       </div>
 
-      <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
 
         {/* response rate */}
         <div className="flex flex-col items-center justify-center gap-1 bg-[var(--color-surface-2)] rounded-xl p-5">

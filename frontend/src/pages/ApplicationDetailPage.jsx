@@ -234,8 +234,8 @@ export default function ApplicationDetailPage() {
 
       {/* ── regeneration overlay ── */}
       {isRegenerating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6">
-          <div className="w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-6">
+          <div className="w-full sm:max-w-md">
             <GenerationProgress
               progress={regenProgress}
               isComplete={regenComplete}
@@ -249,8 +249,8 @@ export default function ApplicationDetailPage() {
 
       {/* ── confirm regenerate modal ── */}
       {showRegenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-6">
+          <div className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4">
             <h2 className="text-base font-bold text-[var(--color-text)]">Regenerate application?</h2>
             <p className="text-sm text-[var(--color-muted)] leading-relaxed">
               This will overwrite your tailored CV, cover letter, fit score, tone analysis, and company
@@ -287,7 +287,7 @@ export default function ApplicationDetailPage() {
 
       {/* ── header card ── */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
 
           {/* score circle */}
           {score != null && (
@@ -324,7 +324,7 @@ export default function ApplicationDetailPage() {
             onClick={() => setShowRegenModal(true)}
             disabled={isRegenerating}
             title="Re-run the full generation pipeline"
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors w-full md:w-auto"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
@@ -333,7 +333,7 @@ export default function ApplicationDetailPage() {
           </button>
 
           {/* status dropdown */}
-          <div className="shrink-0" ref={dropdownRef}>
+          <div className="md:shrink-0" ref={dropdownRef}>
             <p className="text-xs text-[var(--color-muted)] mb-1.5 text-right">Status</p>
             <div className="relative">
               <button
@@ -472,12 +472,12 @@ export default function ApplicationDetailPage() {
       {/* ── tabs ── */}
       <div>
         <div className="border-b border-[var(--color-border)] mb-6">
-          <div className="flex gap-0">
+          <div className="flex overflow-x-auto scrollbar-hide gap-0">
             {TABS.map((tab, i) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(i)}
-                className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                className={`flex-shrink-0 flex items-center gap-1.5 px-4 sm:px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                   activeTab === i
                     ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
                     : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]'

@@ -1,7 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { isLoggedIn, removeToken } from '../utils/auth'
 import api from '../utils/api'
-import { useEffect, useState } from 'react'
 
 const links = [
   { to: '/apply',        label: 'New Application' },
@@ -10,25 +10,47 @@ const links = [
 ]
 
 export default function Navbar() {
-  const navigate   = useNavigate()
-  const loggedIn   = isLoggedIn()
-  const [email, setEmail] = useState('')
+  const navigate      = useNavigate()
+  const loggedIn      = isLoggedIn()
+  const [email, setEmail]       = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const headerRef = useRef(null)
 
   useEffect(() => {
     if (!loggedIn) return
     api.get('/auth/me').then(r => setEmail(r.data.email)).catch(() => {})
   }, [loggedIn])
 
+  // close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    function handler(e) {
+      if (headerRef.current && !headerRef.current.contains(e.target)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
   function handleLogout() {
     removeToken()
+    setMenuOpen(false)
     navigate('/login')
   }
 
-  return (
-    <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+  function closeMenu() {
+    setMenuOpen(false)
+  }
 
-        <NavLink to="/" className="flex items-center gap-2 group">
+  return (
+    <header
+      ref={headerRef}
+      className="border-b border-[var(--color-border)] bg-[var(--color-surface)] sticky top-0 z-50"
+    >
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+
+        <NavLink to="/" onClick={closeMenu} className="flex items-center gap-2 group">
           <span className="w-7 h-7 rounded-md bg-[var(--color-accent)] flex items-center justify-center text-white font-black text-sm select-none">
             L
           </span>
@@ -38,39 +60,92 @@ export default function Navbar() {
         </NavLink>
 
         {loggedIn ? (
-          <div className="flex items-center gap-1">
-            <nav className="flex items-center gap-1">
-              {links.map(({ to, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-[var(--color-surface-2)] text-[var(--color-accent)]'
-                        : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
-                    }`
-                  }
-                >
-                  {label}
-                </NavLink>
-              ))}
-            </nav>
+          <>
+            {/* ── Desktop nav ── */}
+            <div className="hidden lg:flex items-center gap-1">
+              <nav className="flex items-center gap-1">
+                {links.map(({ to, label }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-[var(--color-surface-2)] text-[var(--color-accent)]'
+                          : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
+                      }`
+                    }
+                  >
+                    {label}
+                  </NavLink>
+                ))}
+              </nav>
 
-            <div className="flex items-center gap-2 ml-3 pl-3 border-l border-[var(--color-border)]">
-              {email && (
-                <span className="text-xs text-[var(--color-muted)] hidden sm:block truncate max-w-[160px]">
-                  {email}
-                </span>
-              )}
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/5 transition-colors"
-              >
-                Log out
-              </button>
+              <div className="flex items-center gap-2 ml-3 pl-3 border-l border-[var(--color-border)]">
+                {email && (
+                  <span className="text-xs text-[var(--color-muted)] truncate max-w-[160px]">
+                    {email}
+                  </span>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/5 transition-colors"
+                >
+                  Log out
+                </button>
+              </div>
             </div>
-          </div>
+
+            {/* ── Mobile hamburger ── */}
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              className="lg:hidden p-2 rounded-md text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)] transition-colors"
+              aria-label="Toggle menu"
+            >
+              {menuOpen ? (
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+
+            {/* ── Mobile dropdown ── */}
+            {menuOpen && (
+              <div className="lg:hidden absolute top-full left-0 right-0 bg-[var(--color-surface)] border-t border-[var(--color-border)] shadow-xl z-50">
+                {links.map(({ to, label }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    onClick={closeMenu}
+                    className={({ isActive }) =>
+                      `flex items-center px-6 py-4 text-sm font-medium border-b border-[var(--color-border)] transition-colors ${
+                        isActive
+                          ? 'text-[var(--color-accent)] bg-[var(--color-surface-2)]'
+                          : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
+                      }`
+                    }
+                  >
+                    {label}
+                  </NavLink>
+                ))}
+                <div className="px-6 py-4">
+                  {email && (
+                    <p className="text-xs text-[var(--color-muted)] mb-3 truncate">{email}</p>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="text-sm font-medium text-[var(--color-danger)] hover:underline"
+                  >
+                    Log out
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <nav className="flex items-center gap-2">
             <NavLink

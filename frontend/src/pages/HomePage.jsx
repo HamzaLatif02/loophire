@@ -80,7 +80,7 @@ export default function HomePage() {
           Powered by Claude
         </div>
 
-        <h1 className="text-5xl font-black tracking-tight text-[var(--color-text)] leading-tight">
+        <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-[var(--color-text)] leading-tight">
           Loop<span className="text-[var(--color-accent)]">hire</span>
         </h1>
 
