@@ -2,28 +2,41 @@ const LOOPHIRE_API = "https://api.loophire.xyz"
 const BUTTON_ID    = "loophire-import-btn"
 
 // ── Selectors ──────────────────────────────────────────────────────────────────
-// LinkedIn's DOM structure changes — list all known selectors
-// so the extension degrades gracefully if one stops working.
+// LinkedIn's DOM changes frequently — list multiple fallbacks per category.
 const SELECTORS = {
     jobTitle: [
         ".job-details-jobs-unified-top-card__job-title h1",
         ".jobs-unified-top-card__job-title",
-        "h1.t-24",
+        ".job-details-jobs-unified-top-card__job-title",
+        "h1.t-24.t-bold",
+        "h1[class*='job-title']",
+        ".jobs-search__job-details h1",
+        "h1",  // broad fallback
     ],
     companyName: [
         ".job-details-jobs-unified-top-card__company-name a",
         ".jobs-unified-top-card__company-name a",
-        ".jobs-unified-top-card__subtitle-primary-grouping a",
+        ".job-details-jobs-unified-top-card__primary-description a",
+        "[class*='company-name'] a",
+        ".jobs-unified-top-card__subtitle a",
+        ".job-details-jobs-unified-top-card__subtitle span a",
     ],
     jobDescription: [
         ".jobs-description__content .jobs-box__html-content",
         ".jobs-description-content__text",
         "#job-details",
+        ".job-details-jobs-unified-top-card__job-description",
+        "[class*='description__content']",
+        ".jobs-description",
     ],
     injectTarget: [
         ".job-details-jobs-unified-top-card__container--two-pane",
         ".jobs-unified-top-card",
         ".jobs-details__main-content",
+        ".job-details-jobs-unified-top-card__top-buttons",
+        ".jobs-apply-button--top-card",
+        "[class*='unified-top-card']",
+        ".jobs-search__job-details--wrapper",
     ]
 }
 
@@ -49,11 +62,13 @@ function extractJobData() {
 }
 
 function isJobDetailPage() {
-    // Only show the button on individual job listing pages,
-    // not on the search results list
-    return window.location.href.includes("/jobs/view/") ||
-           (window.location.href.includes("/jobs/") &&
-            !!trySelectors(SELECTORS.jobTitle))
+    const url = window.location.href
+    return (
+        url.includes("/jobs/view/") ||
+        url.includes("currentJobId=") ||
+        (url.includes("/jobs/") &&
+         !!new URLSearchParams(window.location.search).get("currentJobId"))
+    )
 }
 
 // ── Button injection ───────────────────────────────────────────────────────────
@@ -64,7 +79,7 @@ function createButton() {
     btn.innerHTML = `
         <img src="${chrome.runtime.getURL("icons/icon16.png")}"
              width="14" height="14"
-             style="margin-right:6px;vertical-align:middle" />
+             style="margin-right:6px;vertical-align:middle;flex-shrink:0" />
         Import to Loophire
     `
     Object.assign(btn.style, {
@@ -78,9 +93,10 @@ function createButton() {
         fontSize:        "14px",
         fontWeight:      "600",
         cursor:          "pointer",
-        marginTop:       "12px",
+        marginRight:     "8px",
         fontFamily:      "inherit",
         transition:      "background-color 0.15s",
+        whiteSpace:      "nowrap",
     })
     btn.onmouseenter = () => btn.style.backgroundColor = "#3D6BA8"
     btn.onmouseleave = () => btn.style.backgroundColor = "#507DBC"
@@ -154,29 +170,65 @@ async function handleImport(btn) {
 function injectButton() {
     if (document.getElementById(BUTTON_ID)) return
 
-    const target = trySelectors(SELECTORS.injectTarget)
-    if (!target) return
-
     const btn = createButton()
     btn.addEventListener("click", () => handleImport(btn))
-    target.appendChild(btn)
+
+    // Prefer inserting next to LinkedIn's Easy Apply / Save buttons
+    const applyBtn = document.querySelector(
+        ".jobs-apply-button--top-card, " +
+        "[class*='jobs-apply-button'], " +
+        "button[class*='apply']"
+    )
+
+    if (applyBtn?.parentElement) {
+        applyBtn.parentElement.insertBefore(btn, applyBtn)
+    } else {
+        const target = trySelectors(SELECTORS.injectTarget)
+        if (target) target.appendChild(btn)
+        else console.log("Loophire: no inject target found")
+    }
+}
+
+// ── Retry loop ─────────────────────────────────────────────────────────────────
+// LinkedIn renders asynchronously — poll until the DOM is ready.
+let isWaiting = false
+
+function waitForJobPage(maxAttempts = 20, interval = 500) {
+    if (isWaiting) return
+    isWaiting = true
+    let attempts = 0
+
+    const timer = setInterval(() => {
+        attempts++
+        const target      = trySelectors(SELECTORS.injectTarget)
+        const titleExists = trySelectors(SELECTORS.jobTitle)
+
+        if (target && titleExists) {
+            clearInterval(timer)
+            isWaiting = false
+            injectButton()
+        } else if (attempts >= maxAttempts) {
+            clearInterval(timer)
+            isWaiting = false
+            console.log("Loophire: could not find job page elements after", maxAttempts, "attempts")
+        }
+    }, interval)
 }
 
 // ── Observer ───────────────────────────────────────────────────────────────────
-// LinkedIn is a SPA — the DOM updates without full page reloads.
-// Watch for URL changes and re-inject the button as needed.
+// LinkedIn is a SPA — watch for both URL changes and job panel updates
+// (clicking a job in search results updates the panel without changing URL).
 let lastUrl = location.href
 
 const observer = new MutationObserver(() => {
-    if (location.href !== lastUrl) {
+    const urlChanged = location.href !== lastUrl
+    if (urlChanged) {
         lastUrl = location.href
-        setTimeout(() => {
-            if (isJobDetailPage()) injectButton()
-            else {
-                const existing = document.getElementById(BUTTON_ID)
-                if (existing) existing.remove()
-            }
-        }, 1500)
+        document.getElementById(BUTTON_ID)?.remove()
+        isWaiting = false
+    }
+    if (isJobDetailPage() && !document.getElementById(BUTTON_ID)) {
+        waitForJobPage()
     }
 })
 
@@ -185,7 +237,15 @@ observer.observe(document.body, {
     subtree:   true
 })
 
-// Initial injection on page load
+// Initial injection — give LinkedIn extra time to finish rendering
 if (isJobDetailPage()) {
-    setTimeout(injectButton, 1000)
+    setTimeout(() => waitForJobPage(), 800)
 }
+
+// ── Message listener (popup requests job data) ─────────────────────────────────
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "GET_JOB_DATA") {
+        sendResponse(extractJobData())
+    }
+    return true
+})

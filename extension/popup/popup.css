@@ -115,3 +115,45 @@ button:hover { background: #3D6BA8; }
     margin-top: 12px;
 }
 .logout:hover { background: #0D1C33; color: #DAE3E5; }
+
+/* ── Import section ─────────────────────────────────────────────────────────── */
+
+.import-btn {
+    background: #507DBC;
+    margin-bottom: 10px;
+}
+.import-btn:hover { background: #3D6BA8; }
+
+.job-preview {
+    background: #0D1C33;
+    border: 1px solid #1E3A5F;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.job-preview .title {
+    font-weight: 600;
+    color: #FFFFFF;
+    margin-bottom: 2px;
+}
+.job-preview .company {
+    color: #A1C6EA;
+}
+
+.import-status {
+    font-size: 12px;
+    text-align: center;
+    padding: 6px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+.import-status.success {
+    background: #0A261A;
+    color: #4ADE80;
+}
+.import-status.error {
+    background: #1A0A0A;
+    color: #E07070;
+}

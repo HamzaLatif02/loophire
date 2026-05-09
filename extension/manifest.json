@@ -5,7 +5,8 @@
   "description": "One-click import of LinkedIn job listings to Loophire",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "https://www.linkedin.com/*",
