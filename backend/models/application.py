@@ -34,6 +34,7 @@ class Application(Base):
     keyword_gaps = Column(JSON, nullable=True)
     company_research = Column(JSON, nullable=True)
 
+    source_url = Column(String, nullable=True)
     status = Column(
         Enum(ApplicationStatus, name="applicationstatus"),
         nullable=False,

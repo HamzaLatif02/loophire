@@ -149,6 +149,56 @@ class NotesUpdateRequest(BaseModel):
         return sanitise_text(v, "notes")
 
 
+class ExtensionImportRequest(BaseModel):
+    job_title: str
+    company_name: str
+    job_description: str
+    source_url: Optional[str] = None
+    status: str = "draft"
+
+    @field_validator("job_title")
+    @classmethod
+    def validate_job_title(cls, v: str) -> str:
+        v = sanitise_text(v, "job_title")
+        if len(v) < 2:
+            raise ValueError("Job title must be at least 2 characters.")
+        return v
+
+    @field_validator("company_name")
+    @classmethod
+    def validate_company_name(cls, v: str) -> str:
+        v = sanitise_text(v, "company_name")
+        if len(v) < 2:
+            raise ValueError("Company name must be at least 2 characters.")
+        return v
+
+    @field_validator("job_description")
+    @classmethod
+    def validate_job_description(cls, v: str) -> str:
+        v = sanitise_text(v, "job_description")
+        if len(v) < 50:
+            raise ValueError(
+                "Job description is too short (minimum 50 characters)."
+            )
+        check_prompt_injection(v, "job description")
+        return v
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        return sanitise_url(v)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        allowed = {s.value for s in ApplicationStatus}
+        if v not in allowed:
+            raise ValueError(f"status must be one of: {', '.join(allowed)}")
+        return v
+
+
 class AnalyticsResponse(BaseModel):
     total_applications: int
     response_rate: float

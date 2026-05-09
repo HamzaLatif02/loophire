@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Auth state: logged out -->
+        <div id="logged-out" class="hidden">
+            <div class="logo">
+                <img src="../icons/icon48.png" width="32" />
+                <span>Loophire</span>
+            </div>
+            <p class="subtitle">Log in to import jobs with one click</p>
+            <input id="email"    type="email"    placeholder="Email"    />
+            <input id="password" type="password" placeholder="Password" />
+            <button id="login-btn">Log in</button>
+            <p id="login-error" class="error hidden"></p>
+            <a href="https://loophire.xyz/register" target="_blank"
+               class="link">Create account</a>
+        </div>
+
+        <!-- Auth state: logged in -->
+        <div id="logged-in" class="hidden">
+            <div class="logo">
+                <img src="../icons/icon48.png" width="32" />
+                <span>Loophire</span>
+            </div>
+            <p id="user-email" class="email"></p>
+            <div class="divider"></div>
+            <a href="https://loophire.xyz/applications"
+               target="_blank" class="nav-link">
+                📊 View dashboard
+            </a>
+            <a href="https://loophire.xyz/apply"
+               target="_blank" class="nav-link">
+                ✏️ New application
+            </a>
+            <div class="divider"></div>
+            <p class="hint">
+                Navigate to a LinkedIn job listing and click
+                the "Import to Loophire" button on the page.
+            </p>
+            <button id="logout-btn" class="logout">Log out</button>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import ErrorBanner from '../components/ErrorBanner'
 import GenerationProgress from '../components/GenerationProgress'
 import Spinner from '../components/Spinner'
@@ -21,6 +22,10 @@ export default function ApplyPage() {
   const formRef  = useRef(null)
   const liInterval = useRef(null)
 
+  const [searchParams] = useSearchParams()
+  const jobId        = searchParams.get('job_id')
+  const fromExt      = searchParams.get('from_extension') === 'true'
+
   const { progress, isComplete, wsError, applicationId, connect, reset } = useGenerationProgress()
   const [isGenerating, setIsGenerating] = useState(false)
   const invalidateApplications = useInvalidateApplications()
@@ -35,6 +40,14 @@ export default function ApplyPage() {
   // ── form ────────────────────────────────────────────────────────────────────
   const [form, setForm]         = useState({ job_title: '', company_name: '', job_description: '' })
   const [formError, setFormError] = useState('')
+
+  // Pre-fill form when opened from the Chrome extension
+  useEffect(() => {
+    if (!jobId) return
+    api.get(`/applications/${jobId}`)
+      .then(({ data }) => fillForm(data))
+      .catch(() => {})
+  }, [jobId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── CV versions ─────────────────────────────────────────────────────────────
   const [cvVersions, setCvVersions]       = useState([])
@@ -226,6 +239,12 @@ export default function ApplyPage() {
           Search for jobs or paste a description — Loophire handles the rest.
         </p>
       </div>
+
+      {fromExt && (
+        <div className="bg-blue-900/40 border border-blue-700 rounded-lg p-3 text-sm text-blue-200">
+          ✓ Job imported from LinkedIn. Review the details below and click Generate to create your tailored application.
+        </div>
+      )}
 
       {/* ── import panel ── */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">

@@ -31,6 +31,7 @@ from schemas.application import (
     ApplicationPatchRequest,
     ApplicationStatusUpdate,
     ApplicationSummary,
+    ExtensionImportRequest,
     InterviewUpdateRequest,
     NotesUpdateRequest,
     ResponseUpdateRequest,
@@ -262,6 +263,28 @@ async def scrape_job_endpoint(
         raise HTTPException(status_code=422, detail=str(exc))
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/import-from-extension", status_code=201)
+@limiter.limit(LIMITS["app_import_ext"])
+def import_from_extension(
+    request: Request,
+    body: ExtensionImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    app = Application(
+        user_id=current_user.id,
+        job_title=body.job_title,
+        company_name=body.company_name,
+        job_description=body.job_description,
+        source_url=body.source_url,
+        status=body.status,
+    )
+    db.add(app)
+    db.commit()
+    db.refresh(app)
+    return {"id": app.id, "job_title": app.job_title, "company_name": app.company_name, "status": app.status}
 
 
 @router.post("/generate", status_code=202)
