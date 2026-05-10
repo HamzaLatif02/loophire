@@ -96,9 +96,7 @@ function LandingNav() {
     <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)]/90 backdrop-blur-sm">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         <a href="#hero" className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-md bg-[var(--color-accent)] flex items-center justify-center text-white font-black text-sm select-none">
-            L
-          </span>
+          <img src="/favicon.svg" alt="Loophire" className="w-7 h-7 rounded-md" />
           <span className="font-semibold text-[var(--color-text)] tracking-tight">
             Loop<span className="text-[var(--color-accent)]">hire</span>
           </span>
@@ -432,9 +430,7 @@ function Footer() {
     <footer className="border-t border-[var(--color-border)] py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--color-muted)]">
         <div className="flex items-center gap-2">
-          <span className="w-5 h-5 rounded-md bg-[var(--color-accent)] flex items-center justify-center text-white font-black text-[10px] select-none">
-            L
-          </span>
+          <img src="/favicon.svg" alt="Loophire" className="w-5 h-5 rounded-md" />
           <span className="font-semibold text-[var(--color-text)]">
             Loop<span className="text-[var(--color-accent)]">hire</span>
           </span>

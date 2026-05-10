@@ -51,9 +51,7 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
 
         <NavLink to="/home" onClick={closeMenu} className="flex items-center gap-2 group">
-          <span className="w-7 h-7 rounded-md bg-[var(--color-accent)] flex items-center justify-center text-white font-black text-sm select-none">
-            L
-          </span>
+          <img src="/favicon.svg" alt="Loophire" className="w-7 h-7 rounded-md" />
           <span className="font-semibold text-[var(--color-text)] tracking-tight">
             Loop<span className="text-[var(--color-accent)]">hire</span>
           </span>
