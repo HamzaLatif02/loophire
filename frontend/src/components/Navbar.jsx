@@ -46,7 +46,7 @@ export default function Navbar() {
   return (
     <header
       ref={headerRef}
-      className="border-b border-[var(--color-border)] bg-[var(--color-surface)] sticky top-0 z-50"
+      className="border-b border-[var(--color-border)] bg-[#1a1918] sticky top-0 z-50"
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
 
@@ -113,7 +113,7 @@ export default function Navbar() {
 
             {/* ── Mobile dropdown ── */}
             {menuOpen && (
-              <div className="lg:hidden absolute top-full left-0 right-0 bg-[var(--color-surface)] border-t border-[var(--color-border)] shadow-xl z-50">
+              <div className="lg:hidden absolute top-full left-0 right-0 bg-[#1a1918] border-t border-[var(--color-border)] shadow-xl z-50">
                 {links.map(({ to, label }) => (
                   <NavLink
                     key={to}

@@ -93,7 +93,7 @@ export default function LandingPage() {
 
 function LandingNav() {
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)]/90 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[#1a1918]/90 backdrop-blur-sm">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         <a href="#hero" className="flex items-center gap-2">
           <img src="/favicon.svg" alt="Loophire" className="w-7 h-7 rounded-md" />
@@ -427,7 +427,7 @@ function CtaSection() {
 
 function Footer() {
   return (
-    <footer className="border-t border-[var(--color-border)] py-8 px-4 sm:px-6 lg:px-8">
+    <footer className="border-t border-[var(--color-border)] bg-[#1a1918] py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--color-muted)]">
         <div className="flex items-center gap-2">
           <img src="/favicon.svg" alt="Loophire" className="w-5 h-5 rounded-md" />
