@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 
 ROOT       = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BG_COLOR   = (249, 115, 22)   # #f97316 — matches --color-accent in index.css
+BG_COLOR   = (253, 90, 4)     # #fd5a04 — matches --color-accent in index.css
 TEXT_COLOR = (255, 255, 255)
 
 FONT_PATHS = [
