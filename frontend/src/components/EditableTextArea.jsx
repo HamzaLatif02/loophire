@@ -125,7 +125,7 @@ export default function EditableTextArea({ value, onSave, exportUrl, exportFilen
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {saving && <Spinner size={12} />}
                 Save

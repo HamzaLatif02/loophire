@@ -241,7 +241,7 @@ export default function ApplyPage() {
       </div>
 
       {fromExt && (
-        <div className="bg-blue-900/40 border border-blue-700 rounded-lg p-3 text-sm text-blue-200">
+        <div className="bg-[var(--color-success)]/5 border border-[var(--color-success)]/20 rounded-lg p-3 text-sm text-[var(--color-success)]">
           ✓ Job imported from LinkedIn. Review the details below and click Generate to create your tailored application.
         </div>
       )}
