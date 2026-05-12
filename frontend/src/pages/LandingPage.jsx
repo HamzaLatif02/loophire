@@ -133,7 +133,7 @@ function HeroSection() {
           Powered by Claude AI
         </div>
 
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-[var(--color-text)] leading-[1.05]">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-[var(--color-text)] leading-[1.05]">
           Land more<br />
           <span className="text-[var(--color-accent)]">interviews</span><br />
           in less time
