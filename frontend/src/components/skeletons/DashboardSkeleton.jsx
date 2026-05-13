@@ -91,6 +91,36 @@ export function InsightsSkeleton() {
   )
 }
 
+export function KanbanSkeleton() {
+  const cardCounts = [2, 3, 1, 1, 2]
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-6">
+      {Array.from({ length: 5 }).map((_, col) => (
+        <div key={col} className="flex-shrink-0 w-[280px]">
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <SkeletonBlock className="w-2.5 h-2.5 rounded-full" />
+            <SkeletonBlock className="h-4 w-20" />
+          </div>
+          <div className="bg-[var(--color-surface)] rounded-xl p-3 flex flex-col gap-3 min-h-[200px]">
+            {Array.from({ length: cardCounts[col] }).map((_, i) => (
+              <div key={i} className="bg-[var(--color-surface-2)] rounded-lg p-3">
+                <SkeletonBlock className="h-3 w-16 mb-3" />
+                <SkeletonBlock className="h-4 w-full mb-1" />
+                <SkeletonBlock className="h-3 w-3/4 mb-3" />
+                <SkeletonBlock className="h-px w-full mb-2" />
+                <div className="flex justify-between">
+                  <SkeletonBlock className="h-3 w-12" />
+                  <SkeletonBlock className="h-3 w-10" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function TableSkeleton({ rows = 5 }) {
   return (
     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">

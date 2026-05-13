@@ -6,8 +6,9 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import ErrorBanner from '../components/ErrorBanner'
+import KanbanBoard from '../components/KanbanBoard'
 import {
-  ChartSkeleton, InsightsSkeleton, InterviewsSkeleton, StatsSkeleton, TableSkeleton,
+  ChartSkeleton, InsightsSkeleton, InterviewsSkeleton, KanbanSkeleton, StatsSkeleton, TableSkeleton,
 } from '../components/skeletons/DashboardSkeleton'
 import { useAnalytics, useApplications } from '../hooks/useApplications'
 
@@ -55,6 +56,17 @@ export default function DashboardPage() {
     data: analytics,
     isLoading: analyticsLoading,
   } = useAnalytics()
+
+  // view preference — persisted to localStorage
+  const [view, setView] = useState(() => {
+    const saved = localStorage.getItem('loophire_view')
+    return saved === 'kanban' ? 'kanban' : 'table'
+  })
+
+  function switchView(v) {
+    setView(v)
+    localStorage.setItem('loophire_view', v)
+  }
 
   // filter + sort state
   const [statusFilter, setStatusFilter] = useState('all')
@@ -123,7 +135,7 @@ export default function DashboardPage() {
   if (!appsLoading && !appsError && apps.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} />
+        <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} />
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-24 text-center space-y-4">
           <p className="text-4xl">📭</p>
           <p className="font-semibold text-[var(--color-text)]">No applications yet</p>
@@ -146,7 +158,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
 
-      <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} />
+      <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} />
 
       {appsError && (
         <ErrorBanner message={appsError.response?.data?.error ?? appsError.response?.data?.detail ?? 'Failed to load applications.'} />
@@ -232,7 +244,7 @@ export default function DashboardPage() {
       }
 
       {/* ── table controls ── */}
-      {!appsLoading && apps.length > 0 && (
+      {!appsLoading && apps.length > 0 && view === 'table' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-sm text-[var(--color-muted)]">
             {rows.length} of {apps.length} application{apps.length !== 1 ? 's' : ''}
@@ -254,134 +266,141 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── table ── */}
+      {/* ── applications — table or kanban ── */}
       {appsLoading
-        ? <TableSkeleton rows={5} />
-        : rows.length === 0 && apps.length > 0
+        ? (view === 'kanban' ? <KanbanSkeleton /> : <TableSkeleton rows={5} />)
+        : view === 'kanban'
           ? (
-            <div className="rounded-xl border border-dashed border-[var(--color-border)] py-12 text-center">
-              <p className="text-sm text-[var(--color-muted)]">
-                No applications with status "{statusFilter}".
-              </p>
-              <button
-                onClick={() => setStatusFilter('all')}
-                className="mt-3 text-xs text-[var(--color-accent)] hover:underline"
-              >
-                Clear filter
-              </button>
-            </div>
+            <>
+              <p className="text-xs text-[var(--color-muted)] mb-3 sm:hidden">← Scroll to see all columns →</p>
+              <KanbanBoard applications={apps} />
+            </>
           )
-          : apps.length > 0
+          : rows.length === 0 && apps.length > 0
             ? (
-              <>
-                {/* ── Mobile card layout ── */}
-                <div className="md:hidden flex flex-col gap-3">
-                  {rows.map((app) => (
-                    <div
-                      key={app.id}
-                      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 flex flex-col gap-2.5"
-                    >
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[var(--color-text)] truncate flex items-center gap-1.5">
-                            {app.company_name}
-                            {app.notes && (
-                              <span title={app.notes.split('\n')[0]} className="text-xs text-[var(--color-muted)] shrink-0">📝</span>
-                            )}
-                          </p>
-                          <p className="text-sm text-[var(--color-muted)] truncate mt-0.5">{app.job_title}</p>
-                        </div>
-                        {app.fit_score != null && (
-                          <span className="shrink-0 text-sm font-bold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
-                            {Math.round(app.fit_score)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
-                          {app.status}
-                        </span>
-                        <span className="text-xs text-[var(--color-muted)] tabular-nums">
-                          {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => navigate(`/applications/${app.id}`)}
-                        className="w-full py-2 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
-                      >
-                        View →
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ── Desktop table layout ── */}
-                <div className="hidden md:block rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--color-border)]">
-                        <Th>Company</Th>
-                        <Th>Job Title</Th>
-                        <SortTh label="Fit Score" field="fit_score" active={sortField} dir={sortDir} onSort={toggleSort} />
-                        <Th>Status</Th>
-                        <SortTh label="Date" field="created_at" active={sortField} dir={sortDir} onSort={toggleSort} />
-                        <Th align="right">Actions</Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((app, i) => (
-                        <tr
-                          key={app.id}
-                          className={`hover:bg-[var(--color-surface-2)] transition-colors ${
-                            i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
-                          }`}
-                        >
-                          <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px]">
-                            <span className="flex items-center gap-1.5 truncate">
-                              <span className="truncate">{app.company_name}</span>
-                              {app.notes && (
-                                <span title={app.notes.split('\n')[0]} className="shrink-0 text-[var(--color-muted)] text-xs leading-none">📝</span>
-                              )}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
-                            {app.job_title}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            {app.fit_score != null ? (
-                              <span className="text-sm font-semibold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
-                                {Math.round(app.fit_score)}
-                              </span>
-                            ) : (
-                              <span className="text-[var(--color-muted)]">—</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
-                              {app.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
-                            {new Date(app.created_at).toLocaleDateString('en-GB', {
-                              day: 'numeric', month: 'short', year: 'numeric',
-                            })}
-                          </td>
-                          <td className="px-5 py-3.5 text-right">
-                            <button
-                              onClick={() => navigate(`/applications/${app.id}`)}
-                              className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
-                            >
-                              View →
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <div className="rounded-xl border border-dashed border-[var(--color-border)] py-12 text-center">
+                <p className="text-sm text-[var(--color-muted)]">
+                  No applications with status "{statusFilter}".
+                </p>
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  className="mt-3 text-xs text-[var(--color-accent)] hover:underline"
+                >
+                  Clear filter
+                </button>
+              </div>
             )
-            : null
+            : apps.length > 0
+              ? (
+                <>
+                  {/* ── Mobile card layout ── */}
+                  <div className="md:hidden flex flex-col gap-3">
+                    {rows.map((app) => (
+                      <div
+                        key={app.id}
+                        className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 flex flex-col gap-2.5"
+                      >
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-[var(--color-text)] truncate flex items-center gap-1.5">
+                              {app.company_name}
+                              {app.notes && (
+                                <span title={app.notes.split('\n')[0]} className="text-xs text-[var(--color-muted)] shrink-0">📝</span>
+                              )}
+                            </p>
+                            <p className="text-sm text-[var(--color-muted)] truncate mt-0.5">{app.job_title}</p>
+                          </div>
+                          {app.fit_score != null && (
+                            <span className="shrink-0 text-sm font-bold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
+                              {Math.round(app.fit_score)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
+                            {app.status}
+                          </span>
+                          <span className="text-xs text-[var(--color-muted)] tabular-nums">
+                            {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/applications/${app.id}`)}
+                          className="w-full py-2 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                        >
+                          View →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ── Desktop table layout ── */}
+                  <div className="hidden md:block rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--color-border)]">
+                          <Th>Company</Th>
+                          <Th>Job Title</Th>
+                          <SortTh label="Fit Score" field="fit_score" active={sortField} dir={sortDir} onSort={toggleSort} />
+                          <Th>Status</Th>
+                          <SortTh label="Date" field="created_at" active={sortField} dir={sortDir} onSort={toggleSort} />
+                          <Th align="right">Actions</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((app, i) => (
+                          <tr
+                            key={app.id}
+                            className={`hover:bg-[var(--color-surface-2)] transition-colors ${
+                              i < rows.length - 1 ? 'border-b border-[var(--color-border)]' : ''
+                            }`}
+                          >
+                            <td className="px-5 py-3.5 font-medium text-[var(--color-text)] max-w-[160px]">
+                              <span className="flex items-center gap-1.5 truncate">
+                                <span className="truncate">{app.company_name}</span>
+                                {app.notes && (
+                                  <span title={app.notes.split('\n')[0]} className="shrink-0 text-[var(--color-muted)] text-xs leading-none">📝</span>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 text-[var(--color-muted)] max-w-[200px] truncate">
+                              {app.job_title}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              {app.fit_score != null ? (
+                                <span className="text-sm font-semibold tabular-nums" style={{ color: fitColor(app.fit_score) }}>
+                                  {Math.round(app.fit_score)}
+                                </span>
+                              ) : (
+                                <span className="text-[var(--color-muted)]">—</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[app.status] ?? STATUS_STYLES.draft}`}>
+                                {app.status}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
+                              {new Date(app.created_at).toLocaleDateString('en-GB', {
+                                day: 'numeric', month: 'short', year: 'numeric',
+                              })}
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              <button
+                                onClick={() => navigate(`/applications/${app.id}`)}
+                                className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                              >
+                                View →
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )
+              : null
       }
 
     </div>
@@ -390,9 +409,9 @@ export default function DashboardPage() {
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-function PageHeader({ navigate, dataUpdatedAt }) {
+function PageHeader({ navigate, dataUpdatedAt, view, onSwitchView }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-start sm:items-center justify-between gap-3">
       <div>
         <h1 className="text-2xl font-bold text-[var(--color-text)]">Dashboard</h1>
         <p className="text-sm text-[var(--color-muted)] mt-1">Track and manage your applications</p>
@@ -402,12 +421,38 @@ function PageHeader({ navigate, dataUpdatedAt }) {
           </p>
         )}
       </div>
-      <button
-        onClick={() => navigate('/apply')}
-        className="shrink-0 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
-      >
-        + New
-      </button>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 bg-[var(--color-surface)] rounded-lg p-1 border border-[var(--color-border)]">
+          <button
+            onClick={() => onSwitchView('table')}
+            title="Table view"
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              view === 'table'
+                ? 'bg-[var(--color-surface-2)] text-[var(--color-text)]'
+                : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            ☰ Table
+          </button>
+          <button
+            onClick={() => onSwitchView('kanban')}
+            title="Board view"
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              view === 'kanban'
+                ? 'bg-[var(--color-surface-2)] text-[var(--color-text)]'
+                : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            ⊞ Board
+          </button>
+        </div>
+        <button
+          onClick={() => navigate('/apply')}
+          className="shrink-0 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
+        >
+          + New
+        </button>
+      </div>
     </div>
   )
 }
