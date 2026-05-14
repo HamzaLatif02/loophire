@@ -1,9 +1,21 @@
 import logging
 import os
+import re
 import subprocess
 import tempfile
 
 logger = logging.getLogger(__name__)
+
+# Fallback GitHub URLs keyed by lowercase project-name fragment
+KNOWN_PROJECT_URLS = {
+    "loophire": "https://github.com/HamzaLatif02/loophire",
+}
+
+# Bare domain names that may appear in bullet text without a scheme
+KNOWN_LIVE_SITES = {
+    "loophire.xyz": "https://loophire.xyz",
+    "hamzalatif.xyz": "https://hamzalatif.xyz",
+}
 
 
 def generate_cv_pdf(tailored_content: dict) -> bytes:
@@ -50,7 +62,7 @@ def generate_cv_pdf(tailored_content: dict) -> bytes:
 
 
 def escape_latex(text: str) -> str:
-    """Escape special LaTeX characters in plain text."""
+    """Escape special LaTeX characters in plain text (no embedded commands)."""
     chars = {
         "&": r"\&",
         "%": r"\%",
@@ -66,12 +78,114 @@ def escape_latex(text: str) -> str:
     return "".join(chars.get(c, c) for c in text)
 
 
+def get_project_github_url(proj: dict) -> str:
+    """Return github_url from proj, falling back to KNOWN_PROJECT_URLS by name."""
+    url = proj.get("github_url", "")
+    if url:
+        return url
+    name = proj.get("name", "").lower()
+    for key, known_url in KNOWN_PROJECT_URLS.items():
+        if key in name:
+            return known_url
+    return ""
+
+
+def linkify_live_sites(text: str) -> str:
+    """
+    Wrap known bare domain names in \\href commands.
+    Skips domains already preceded by '://' (handled by linkify_urls_in_text).
+    """
+    for domain, url in KNOWN_LIVE_SITES.items():
+        pattern = r'(?<!://)(?<!\w)' + re.escape(domain) + r'(?!\w)'
+        replacement = lambda m, d=domain, u=url: (
+            rf'\href{{{u}}}{{\textcolor{{blue}}{{\underline{{{d}}}}}}}'
+        )
+        text = re.sub(pattern, replacement, text)
+    return text
+
+
+def linkify_urls_in_text(text: str) -> str:
+    """
+    Wrap bare https?:// URLs in \\href commands.
+    Excludes {} from the URL match so existing \\href contents are not re-matched.
+    """
+    def _replace(m):
+        url = m.group(1)
+        display = re.sub(r'^https?://', '', url)
+        return rf'\href{{{url}}}{{\textcolor{{blue}}{{\underline{{{display}}}}}}}'
+
+    return re.sub(r'(https?://[^\s\),\]\'\"\\\{\}]+)', _replace, text)
+
+
+def escape_latex_outside_commands(text: str) -> str:
+    """
+    Escape LaTeX special characters in text, skipping the content of
+    \\command{...}{...} brace groups so that injected \\href commands survive.
+    """
+    chars = {
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "_": r"\_",
+        "{": r"\{",
+        "}": r"\}",
+        "~": r"\textasciitilde{}",
+        "^": r"\^{}",
+        "\\": r"\textbackslash{}",
+    }
+    result = []
+    i = 0
+    while i < len(text):
+        if text[i] == '\\':
+            # Read the command name (letters only)
+            j = i + 1
+            while j < len(text) and text[j].isalpha():
+                j += 1
+            result.append(text[i:j])
+            i = j
+            # Consume ALL consecutive brace groups after the command
+            while i < len(text) and text[i] == '{':
+                depth = 0
+                result.append(text[i])  # opening {
+                i += 1
+                while i < len(text):
+                    c = text[i]
+                    if c == '{':
+                        depth += 1
+                        result.append(c)
+                        i += 1
+                    elif c == '}':
+                        if depth == 0:
+                            result.append(c)  # matching closing }
+                            i += 1
+                            break
+                        depth -= 1
+                        result.append(c)
+                        i += 1
+                    else:
+                        result.append(c)
+                        i += 1
+        else:
+            result.append(chars.get(text[i], text[i]))
+            i += 1
+    return "".join(result)
+
+
+def process_bullet(text: str) -> str:
+    """Full pipeline: linkify known sites → linkify URLs → escape outside commands."""
+    text = linkify_live_sites(text)
+    text = linkify_urls_in_text(text)
+    text = escape_latex_outside_commands(text)
+    return text
+
+
 def build_latex(d: dict) -> str:
     # Experience
     experience_latex = ""
     for exp in d.get("experience", []):
         bullets = "\n".join(
-            f"                \\item {escape_latex(b)}" for b in exp.get("highlights", [])
+            f"                \\item {process_bullet(b)}" for b in exp.get("highlights", [])
         )
         experience_latex += f"""
     \\begin{{twocolentry}}{{
@@ -93,9 +207,9 @@ def build_latex(d: dict) -> str:
     projects_latex = ""
     for proj in d.get("projects", []):
         bullets = "\n".join(
-            f"                \\item {escape_latex(b)}" for b in proj.get("highlights", [])
+            f"                \\item {process_bullet(b)}" for b in proj.get("highlights", [])
         )
-        github_url = proj.get("github_url", "")
+        github_url = get_project_github_url(proj)
         github_link = (
             f"\\href{{{github_url}}}{{\\textcolor{{blue}}{{\\underline{{Github Repo}}}}}}"
             if github_url
@@ -127,7 +241,7 @@ def build_latex(d: dict) -> str:
     education_latex = ""
     for edu in d.get("education", []):
         bullets = "\n".join(
-            f"                \\item {escape_latex(b)}" for b in edu.get("highlights", [])
+            f"                \\item {process_bullet(b)}" for b in edu.get("highlights", [])
         )
         education_latex += f"""
     \\begin{{twocolentry}}{{
@@ -145,7 +259,7 @@ def build_latex(d: dict) -> str:
     \\vspace{{0.2 cm}}
     """
 
-    profile_escaped = escape_latex(d.get("profile", ""))
+    profile_processed = process_bullet(d.get("profile", ""))
 
     return (
         r"""
@@ -159,7 +273,7 @@ def build_latex(d: dict) -> str:
 \usepackage{enumitem}
 \usepackage{fontawesome5}
 \usepackage{amsmath}
-\usepackage[pdftitle={Hamza Latif's CV},pdfauthor={Hamza Latif},colorlinks=true,urlcolor=primaryColor]{hyperref}
+\usepackage[pdftitle={Hamza Latif's CV},pdfauthor={Hamza Latif},colorlinks=true,urlcolor=blue,linkcolor=blue,filecolor=blue]{hyperref}
 \usepackage[pscoord]{eso-pic}
 \usepackage{calc}
 \usepackage{bookmark}
@@ -230,7 +344,7 @@ def build_latex(d: dict) -> str:
     \section{Profile}
         \begin{onecolentry}
             """
-        + profile_escaped
+        + profile_processed
         + r"""
         \end{onecolentry}
 

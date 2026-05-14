@@ -17,7 +17,12 @@ from agents.writer_agent import write_application
 from database import SessionLocal, get_db
 from dependencies.auth_dependency import get_current_user
 from services.job_scraper_service import scrape_job
-from services.latex_export_service import generate_cv_pdf
+from services.latex_export_service import (
+    generate_cv_pdf,
+    linkify_live_sites,
+    linkify_urls_in_text,
+    process_bullet,
+)
 from services.memory_service import get_preferences
 from services.pdf_export_service import generate_pdf
 from services.research_service import research_company
@@ -632,6 +637,25 @@ def create_interview_prep(
 
 def _safe_filename(text: str) -> str:
     return re.sub(r"[^\w]+", "_", text).strip("_").lower()
+
+
+@router.post("/debug/latex-process")
+async def debug_latex_process(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Debug endpoint: show each stage of the bullet linkification pipeline."""
+    body = await request.json()
+    text = body.get("text", "")
+    step1 = linkify_live_sites(text)
+    step2 = linkify_urls_in_text(step1)
+    step3 = process_bullet(text)
+    return {
+        "input": text,
+        "after_live_sites": step1,
+        "after_urls": step2,
+        "final": step3,
+    }
 
 
 @router.get("/{application_id}/export/cv")
