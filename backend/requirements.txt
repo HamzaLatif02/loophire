@@ -21,3 +21,4 @@ slowapi
 limits
 websockets
 pydantic[email]
+email-validator

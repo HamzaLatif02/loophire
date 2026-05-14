@@ -26,6 +26,27 @@ logging.basicConfig(
 
 app = FastAPI(title="Loophire API")
 
+# ── bot blocker ───────────────────────────────────────────────────────────────
+# Reject requests for paths that only scanners and bots hit.
+
+_BOT_PATH_FRAGMENTS = (
+    ".php", "wp-login", "wp-admin", "xmlrpc",
+    "phpmyadmin", ".env", "phpinfo", "shell",
+    "actuator", ".git/", "cgi-bin",
+)
+
+class BotBlockerMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        path = request.url.path.lower()
+        if any(frag in path for frag in _BOT_PATH_FRAGMENTS):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "Forbidden", "status_code": 403},
+            )
+        return await call_next(request)
+
+app.add_middleware(BotBlockerMiddleware)
+
 # ── security headers ──────────────────────────────────────────────────────────
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

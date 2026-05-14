@@ -3,6 +3,24 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 
+def get_client_ip(request: Request) -> str:
+    """
+    Best-effort real-IP extraction behind Railway's edge proxy.
+    Trusts X-Forwarded-For > X-Real-IP > direct client host.
+    Falls back to "127.0.0.1" so the counter still accumulates rather
+    than returning a new key on every request.
+    """
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        return xff.split(",")[0].strip()
+    xri = request.headers.get("X-Real-IP")
+    if xri:
+        return xri.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "127.0.0.1"
+
+
 def get_user_id(request: Request) -> str:
     """Rate-limit key: user_id from JWT when authenticated, IP address otherwise."""
     try:
@@ -14,10 +32,11 @@ def get_user_id(request: Request) -> str:
             return f"user:{user_id}"
     except Exception:
         pass
-    return f"ip:{get_remote_address(request)}"
+    return f"ip:{get_client_ip(request)}"
 
 
-limiter = Limiter(key_func=get_user_id)
+# Explicit in-memory storage so the URI is never ambiguous
+limiter = Limiter(key_func=get_user_id, storage_uri="memory://")
 
 LIMITS = {
     # Auth
