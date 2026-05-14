@@ -43,64 +43,99 @@ async function showLoggedIn(token) {
 function isLinkedInJobPage(url) {
     if (!url) return false
     try {
-        const parsed = new URL(url)
-        if (!parsed.hostname.includes("linkedin.com")) return false
-        if (parsed.pathname.includes("/jobs/view/")) return true
-        if (parsed.pathname.includes("/jobs/search") &&
-            parsed.searchParams.get("currentJobId")) return true
-        if (parsed.pathname.includes("/jobs/") &&
-            parsed.searchParams.get("currentJobId")) return true
+        const u = new URL(url)
+        if (!u.hostname.includes("linkedin.com")) return false
+        if (u.pathname.includes("/jobs/view/"))   return true
+        if (u.pathname.includes("/jobs/search") &&
+            u.searchParams.get("currentJobId"))   return true
+        if (u.pathname.includes("/jobs/") &&
+            u.searchParams.get("currentJobId"))   return true
+        if (/\/jobs\/\d+/.test(u.pathname))       return true
         return false
+    } catch { return false }
+}
+
+async function pingContentScript(tabId) {
+    try {
+        const response = await chrome.tabs.sendMessage(tabId, { type: "PING" })
+        return response?.alive === true
     } catch {
         return false
     }
 }
 
-const LOADING_HINT = `
-    <p class="hint">
-        Job page detected but still loading.<br/>
-        Wait a moment and reopen the extension.
-    </p>
-    <div class="divider"></div>
-`
-
 async function checkCurrentTab() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-
     const importSection = document.getElementById("import-section")
     const notJobPage    = document.getElementById("not-job-page")
 
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
     if (!tab?.url || !isLinkedInJobPage(tab.url)) {
+        notJobPage.innerHTML = `
+            <p class="hint">
+                Navigate to a LinkedIn job listing to import it directly.
+            </p>
+            <div class="divider"></div>
+        `
         notJobPage.classList.remove("hidden")
         importSection.classList.add("hidden")
         return
     }
 
-    // Give LinkedIn's async renderer time to paint the job panel
-    await new Promise(resolve => setTimeout(resolve, 800))
+    // Job page detected — wait for the content script to become ready
+    notJobPage.innerHTML = `<p class="hint">Job page detected — loading…</p>`
+    notJobPage.classList.remove("hidden")
+    importSection.classList.add("hidden")
+
+    let alive   = false
+    let attempt = 0
+    while (!alive && attempt < 5) {
+        attempt++
+        alive = await pingContentScript(tab.id)
+        if (!alive) await new Promise(r => setTimeout(r, 600))
+    }
+
+    if (!alive) {
+        notJobPage.innerHTML = `
+            <p class="hint">
+                Page still loading. Close and reopen this popup in a moment.
+            </p>
+            <div class="divider"></div>
+        `
+        return
+    }
 
     try {
-        const response = await chrome.tabs.sendMessage(tab.id, {
-            type: "GET_JOB_DATA"
-        })
+        const job = await chrome.tabs.sendMessage(tab.id, { type: "GET_JOB_DATA" })
 
-        if (response?.job_title) {
+        if (job?.job_title) {
             importSection.classList.remove("hidden")
             notJobPage.classList.add("hidden")
-            document.getElementById("job-preview").innerHTML =
-                `<div class="title">${escapeHtml(response.job_title)}</div>` +
-                `<div class="company">${escapeHtml(response.company_name)}</div>`
-            window._jobData = response
+            document.getElementById("job-preview").innerHTML = `
+                <div class="title">${escapeHtml(job.job_title)}</div>
+                <div class="company">${escapeHtml(job.company_name || "Unknown company")}</div>
+            `
+            window._jobData = job
         } else {
+            notJobPage.innerHTML = `
+                <p class="hint">
+                    Job details still loading.<br/>
+                    Wait a moment and reopen the popup.
+                </p>
+                <div class="divider"></div>
+            `
             notJobPage.classList.remove("hidden")
-            notJobPage.innerHTML = LOADING_HINT
             importSection.classList.add("hidden")
         }
-    } catch {
-        // Content script not yet injected — page still loading
-        notJobPage.classList.remove("hidden")
-        notJobPage.innerHTML = LOADING_HINT
-        importSection.classList.add("hidden")
+    } catch (e) {
+        console.error("[Loophire popup]", e)
+        notJobPage.innerHTML = `
+            <p class="hint">
+                Could not read this page.<br/>
+                Try refreshing and reopening the popup.
+            </p>
+            <div class="divider"></div>
+        `
     }
 }
 
