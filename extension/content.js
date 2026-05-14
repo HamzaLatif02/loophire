@@ -6,6 +6,20 @@ function log(...args)  { console.log(LOG_PREFIX, ...args) }
 function warn(...args) { console.warn(LOG_PREFIX, ...args) }
 function err(...args)  { console.error(LOG_PREFIX, ...args) }
 
+// ── Context validity guard ────────────────────────────────────────────────────
+// When the extension is reloaded while this script is still running in a tab,
+// chrome.runtime becomes invalid. Detect this and shut down gracefully so the
+// script stops trying to use chrome APIs (which would produce
+// "GET chrome-extension://invalid/" errors in the console).
+
+function isContextValid() {
+    try {
+        return typeof chrome !== "undefined" && !!chrome.runtime?.id
+    } catch {
+        return false
+    }
+}
+
 // ── URL detection ─────────────────────────────────────────────────────────────
 
 function isJobDetailPage() {
@@ -305,6 +319,10 @@ function waitAndInject() {
     let injectionAttempts = 0
 
     const timer = setInterval(() => {
+        if (!isContextValid()) {
+            clearInterval(timer)
+            return
+        }
         injectionAttempts++
         log(`Injection attempt ${injectionAttempts}/${MAX_ATTEMPTS}`)
 
@@ -351,6 +369,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 let lastUrl = location.href
 
 const observer = new MutationObserver(() => {
+    if (!isContextValid()) {
+        observer.disconnect()
+        return
+    }
     if (location.href === lastUrl) return
     lastUrl = location.href
     log("URL changed to:", lastUrl)
