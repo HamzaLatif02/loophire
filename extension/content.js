@@ -8,9 +8,7 @@ function err(...args)  { console.error(LOG_PREFIX, ...args) }
 
 // ── Context validity guard ────────────────────────────────────────────────────
 // When the extension is reloaded while this script is still running in a tab,
-// chrome.runtime becomes invalid. Detect this and shut down gracefully so the
-// script stops trying to use chrome APIs (which would produce
-// "GET chrome-extension://invalid/" errors in the console).
+// chrome.runtime becomes invalid. Detect this and shut down gracefully.
 
 function isContextValid() {
     try {
@@ -77,22 +75,25 @@ const SELECTORS = {
         ".jobs-description",
     ],
     injectTarget: [
-        ".job-details-jobs-unified-top-card__top-buttons",
-        ".jobs-unified-top-card__top-buttons",
-        ".job-details-jobs-unified-top-card__actions",
+        ".jobs-unified-top-card__primary-actions",
         ".jobs-apply-button--top-card",
-        "[class*='top-card'][class*='actions']",
-        "[class*='top-card'][class*='buttons']",
+        "[class*='unified-top-card'][class*='primary-actions']",
+        "[class*='unified-top-card'][class*='actions']",
         ".job-details-jobs-unified-top-card__container--two-pane",
         ".jobs-unified-top-card",
-        ".jobs-details__main-content",
         "[class*='unified-top-card']",
     ],
     applyButton: [
+        ".jobs-apply-button--top-card .artdeco-button--primary",
         ".jobs-apply-button--top-card button",
+        "[class*='jobs-apply-button'] button.artdeco-button--primary",
         "[class*='jobs-apply-button'] button",
-        "button[class*='jobs-apply']",
-        ".artdeco-button--primary",
+        "button.jobs-apply-button",
+        ".artdeco-button--primary[data-job-id]",
+        ".jobs-unified-top-card__primary-actions button.artdeco-button--primary",
+        "button.artdeco-button.artdeco-button--primary[aria-label*='Apply']",
+        "button[aria-label*='Apply to']",
+        "button[aria-label*='Easy Apply']",
     ],
 }
 
@@ -135,46 +136,65 @@ function extractJobData() {
 
 // ── Button ────────────────────────────────────────────────────────────────────
 
-function createButton(state = "idle") {
+function createButton() {
     const btn = document.createElement("button")
     btn.id = BUTTON_ID
 
+    // Match LinkedIn's exact button styling — pill-shaped, 32px tall
     Object.assign(btn.style, {
         display:         "inline-flex",
         alignItems:      "center",
+        justifyContent:  "center",
         gap:             "6px",
-        padding:         "8px 16px",
+        padding:         "0 16px",
+        height:          "32px",
         backgroundColor: "#fd5a04",
         color:           "#FFFFFF",
-        border:          "none",
-        borderRadius:    "6px",
+        border:          "1px solid #fd5a04",
+        borderRadius:    "16px",
         fontSize:        "14px",
         fontWeight:      "600",
+        lineHeight:      "1",
         cursor:          "pointer",
-        fontFamily:      "inherit",
-        transition:      "background-color 0.15s, opacity 0.15s",
+        fontFamily:      "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         whiteSpace:      "nowrap",
         flexShrink:      "0",
+        transition:      "background-color 0.15s, border-color 0.15s",
+        textDecoration:  "none",
+        outline:         "none",
+        boxSizing:       "border-box",
+        marginLeft:      "8px",
     })
 
-    btn.onmouseenter = () => { if (!btn.disabled) btn.style.backgroundColor = "#e04e03" }
-    btn.onmouseleave = () => { if (!btn.disabled) btn.style.backgroundColor = "#fd5a04" }
+    btn.onmouseenter = () => {
+        if (!btn.disabled) {
+            btn.style.backgroundColor = "#e04e03"
+            btn.style.borderColor     = "#e04e03"
+        }
+    }
+    btn.onmouseleave = () => {
+        if (!btn.disabled) {
+            btn.style.backgroundColor = "#fd5a04"
+            btn.style.borderColor     = "#fd5a04"
+        }
+    }
 
-    setButtonState(btn, state)
+    setButtonState(btn, "idle")
     return btn
 }
 
 function setButtonState(btn, state) {
     const states = {
-        idle:    { text: "⚡ Import to Loophire", bg: "#fd5a04", disabled: false, opacity: "1"   },
-        loading: { text: "Importing…",            bg: "#c44503", disabled: true,  opacity: "0.8" },
-        success: { text: "✓ Imported!",           bg: "#16a34a", disabled: true,  opacity: "1"   },
-        error:   { text: "Import failed — retry", bg: "#dc2626", disabled: false, opacity: "1"   },
-        noauth:  { text: "Log in to Loophire",    bg: "#6b7280", disabled: false, opacity: "1"   },
+        idle:    { text: "⚡ Import to Loophire", bg: "#fd5a04", border: "#fd5a04", disabled: false, opacity: "1"   },
+        loading: { text: "Importing…",            bg: "#c44503", border: "#c44503", disabled: true,  opacity: "0.8" },
+        success: { text: "✓ Imported!",           bg: "#16a34a", border: "#16a34a", disabled: true,  opacity: "1"   },
+        error:   { text: "Import failed — retry", bg: "#dc2626", border: "#dc2626", disabled: false, opacity: "1"   },
+        noauth:  { text: "Log in to Loophire",    bg: "#6b7280", border: "#6b7280", disabled: false, opacity: "1"   },
     }
     const s = states[state] || states.idle
     btn.textContent           = s.text
     btn.style.backgroundColor = s.bg
+    btn.style.borderColor     = s.border
     btn.style.opacity         = s.opacity
     btn.disabled              = s.disabled
 }
@@ -231,89 +251,55 @@ async function handleImport(btn) {
 
 function injectButton() {
     if (document.getElementById(BUTTON_ID)) {
-        log("Button already exists — skipping injection")
+        log("Button already exists — skipping")
         return
     }
+    log("=== Attempting injection ===")
 
-    log("=== Attempting button injection ===")
-
-    // Prefer inserting next to the Easy Apply button
+    // Primary target: the apply button
     const applyBtn = trySelectors(SELECTORS.applyButton, "applyButton")
-    if (applyBtn?.parentElement) {
-        log("Injecting next to apply button")
+
+    if (applyBtn) {
+        log("Found apply button — injecting next to it")
         const btn = createButton()
         btn.addEventListener("click", () => handleImport(btn))
-        applyBtn.parentElement.insertBefore(btn, applyBtn.nextSibling)
-        log("✓ Button injected next to apply button")
+
+        // Insert after the apply button's group so ordering is: Apply | Import | Save
+        const parent = applyBtn.closest(
+            ".jobs-apply-button--top-card, " +
+            "[class*='jobs-apply-button'], " +
+            "[class*='top-card'][class*='action'], " +
+            "[class*='top-card'][class*='button']"
+        ) || applyBtn.parentElement
+
+        if (parent) {
+            parent.insertAdjacentElement("afterend", btn)
+            log("✓ Injected after apply button group")
+        } else {
+            applyBtn.insertAdjacentElement("afterend", btn)
+            log("✓ Injected after apply button directly")
+        }
         return
     }
 
-    // Fall back to the top card container
+    // Secondary: top card container
     const target = trySelectors(SELECTORS.injectTarget, "injectTarget")
     if (target) {
         log("Injecting into top card container")
         const btn = createButton()
         btn.addEventListener("click", () => handleImport(btn))
-        target.insertBefore(btn, target.firstChild)
-        log("✓ Button injected into container")
+        target.appendChild(btn)
+        log("✓ Injected into container as fallback")
         return
     }
 
-    // Last resort — floating button
-    warn("No target found — using floating fallback button")
-    const btn = createButton()
-    btn.addEventListener("click", () => handleImport(btn))
-    Object.assign(btn.style, {
-        position:     "fixed",
-        bottom:       "32px",
-        right:        "32px",
-        zIndex:       "99999",
-        boxShadow:    "0 8px 24px rgba(253, 90, 4, 0.35)",
-        borderRadius: "50px",
-        padding:      "12px 20px",
-        fontSize:     "14px",
-    })
-
-    // Inject CSS keyframes for the pulsing ring
-    const styleEl = document.createElement("style")
-    styleEl.textContent = `
-        @keyframes loophire-pulse {
-            0%, 100% { opacity: 0.6; transform: scale(1); }
-            50%       { opacity: 0;   transform: scale(1.15); }
-        }
-    `
-    document.head.appendChild(styleEl)
-
-    // Add the button first so we can measure its rendered size
-    document.body.appendChild(btn)
-
-    // Build the pulsing ring after the button is in the DOM
-    requestAnimationFrame(() => {
-        const w = btn.offsetWidth  || 200
-        const h = btn.offsetHeight || 44
-        const ring = document.createElement("div")
-        Object.assign(ring.style, {
-            position:     "fixed",
-            bottom:       "28px",
-            right:        "28px",
-            width:        w + "px",
-            height:       h + "px",
-            borderRadius: "50px",
-            border:       "2px solid #fd5a04",
-            zIndex:       "99998",
-            animation:    "loophire-pulse 2s ease-in-out infinite",
-            pointerEvents: "none",
-        })
-        document.body.appendChild(ring)
-    })
-
-    log("✓ Floating button injected as fallback")
+    warn("No injection target found — button will not be shown")
 }
 
 // ── Retry mechanism ───────────────────────────────────────────────────────────
 
-const MAX_ATTEMPTS   = 30
-const RETRY_INTERVAL = 500
+const MAX_ATTEMPTS   = 40
+const RETRY_INTERVAL = 300
 
 function waitAndInject() {
     let injectionAttempts = 0
@@ -337,14 +323,13 @@ function waitAndInject() {
         const hasTarget = !!document.querySelector(SELECTORS.injectTarget[0]) ||
                           !!document.querySelector("[class*='unified-top-card']")
 
-        if (hasTitle || hasTarget || injectionAttempts >= MAX_ATTEMPTS) {
+        if (hasTitle || hasTarget) {
             clearInterval(timer)
-            if (hasTitle || hasTarget) {
-                log("Page ready — injecting button")
-            } else {
-                warn("Max attempts reached — injecting fallback")
-            }
+            log("Page ready — injecting button")
             injectButton()
+        } else if (injectionAttempts >= MAX_ATTEMPTS) {
+            clearInterval(timer)
+            warn("Max attempts reached — no suitable injection target found on this page. The button will not be shown.")
         }
     }, RETRY_INTERVAL)
 }
@@ -364,37 +349,72 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true
 })
 
-// ── SPA navigation observer ───────────────────────────────────────────────────
+// ── Initial run + SPA navigation ──────────────────────────────────────────────
 
 let lastUrl = location.href
 
-const observer = new MutationObserver(() => {
+log("Content script loaded on:", location.href)
+
+// Strategy 1: Direct injection if already on a job page
+// Try immediately, then keep retrying until DOM is fully rendered
+if (isJobDetailPage()) {
+    log("Job page on load — starting immediate injection")
+    injectButton()
+    waitAndInject()
+}
+
+// Strategy 2: Watch for LinkedIn SPA navigations
+// LinkedIn loads content dynamically — the URL changes but the page does not reload
+const navObserver = new MutationObserver(() => {
     if (!isContextValid()) {
-        observer.disconnect()
+        navObserver.disconnect()
         return
     }
-    if (location.href === lastUrl) return
-    lastUrl = location.href
-    log("URL changed to:", lastUrl)
+    const currentUrl = location.href
+    if (currentUrl === lastUrl) return
+    lastUrl = currentUrl
+    log("SPA navigation detected:", currentUrl)
 
     document.getElementById(BUTTON_ID)?.remove()
 
     if (isJobDetailPage()) {
-        log("New URL is a job page — waiting to inject")
-        setTimeout(() => waitAndInject(), 1000)
-    } else {
-        log("New URL is not a job page — not injecting")
+        log("New URL is a job page — injecting")
+        setTimeout(() => waitAndInject(), 300)
     }
 })
 
-observer.observe(document.body, { childList: true, subtree: true })
+navObserver.observe(document.body, {
+    childList: true,
+    subtree:   true
+})
 
-// ── Initial run ───────────────────────────────────────────────────────────────
+// Strategy 3: Listen for LinkedIn's own navigation events
+window.addEventListener("popstate", () => {
+    log("popstate fired:", location.href)
+    document.getElementById(BUTTON_ID)?.remove()
+    if (isJobDetailPage()) {
+        setTimeout(() => waitAndInject(), 500)
+    }
+})
 
-log("Content script loaded on:", location.href)
-if (isJobDetailPage()) {
-    log("Job page detected on load — starting injection")
-    setTimeout(() => waitAndInject(), 800)
-} else {
-    log("Not a job page on load — waiting for navigation")
+// Intercept pushState to detect SPA navigation
+const originalPushState = history.pushState.bind(history)
+history.pushState = function(...args) {
+    originalPushState(...args)
+    log("pushState called:", location.href)
+    setTimeout(() => {
+        document.getElementById(BUTTON_ID)?.remove()
+        if (isJobDetailPage()) waitAndInject()
+    }, 300)
+}
+
+const originalReplaceState = history.replaceState.bind(history)
+history.replaceState = function(...args) {
+    originalReplaceState(...args)
+    log("replaceState called:", location.href)
+    setTimeout(() => {
+        if (isJobDetailPage() && !document.getElementById(BUTTON_ID)) {
+            waitAndInject()
+        }
+    }, 300)
 }
