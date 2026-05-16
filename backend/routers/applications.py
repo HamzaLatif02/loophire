@@ -70,6 +70,7 @@ async def run_generation_pipeline(
     cv_text: str,
     cv_links: list,
     user_preferences,
+    cv_version_name: Optional[str] = None,
 ):
     p = progress_manager
     # Brief pause so the WebSocket client has time to connect
@@ -111,24 +112,68 @@ async def run_generation_pipeline(
         await p.send_progress(job_id, "saving", "Saving your application…", 93)
         db = SessionLocal()
         try:
-            application = Application(
-                user_id=user_id,
-                job_title=body.job_title,
-                company_name=body.company_name,
-                job_description=body.job_description,
-                fit_score=fit_analysis.get("fit_score"),
-                keyword_gaps=fit_analysis.get("keyword_gaps"),
-                company_research=company_research,
-                tailored_cv=written["tailored_cv"],
-                tailored_cv_json=written["tailored_cv_json"],
-                cover_letter=written["cover_letter"],
-                tone_analysis=written.get("tone_analysis"),
-                status=ApplicationStatus.draft,
-            )
-            db.add(application)
-            db.commit()
-            db.refresh(application)
-            app_id = application.id
+            if body.existing_application_id:
+                application = db.query(Application).filter(
+                    Application.id == body.existing_application_id,
+                    Application.user_id == user_id,
+                ).first()
+                if application:
+                    application.job_title        = body.job_title
+                    application.company_name     = body.company_name
+                    application.job_description  = body.job_description
+                    application.fit_score        = fit_analysis.get("fit_score")
+                    application.keyword_gaps     = fit_analysis.get("keyword_gaps")
+                    application.company_research = company_research
+                    application.tailored_cv      = written["tailored_cv"]
+                    application.tailored_cv_json = written["tailored_cv_json"]
+                    application.cover_letter     = written["cover_letter"]
+                    application.tone_analysis    = written.get("tone_analysis")
+                    application.cv_version_name  = cv_version_name
+                    application.last_generated_at = datetime.now(timezone.utc)
+                    db.commit()
+                    db.refresh(application)
+                    app_id = application.id
+                else:
+                    # Fall back to creating if the referenced application no longer exists
+                    application = Application(
+                        user_id=user_id,
+                        job_title=body.job_title,
+                        company_name=body.company_name,
+                        job_description=body.job_description,
+                        fit_score=fit_analysis.get("fit_score"),
+                        keyword_gaps=fit_analysis.get("keyword_gaps"),
+                        company_research=company_research,
+                        tailored_cv=written["tailored_cv"],
+                        tailored_cv_json=written["tailored_cv_json"],
+                        cover_letter=written["cover_letter"],
+                        tone_analysis=written.get("tone_analysis"),
+                        cv_version_name=cv_version_name,
+                        status=ApplicationStatus.draft,
+                    )
+                    db.add(application)
+                    db.commit()
+                    db.refresh(application)
+                    app_id = application.id
+            else:
+                application = Application(
+                    user_id=user_id,
+                    job_title=body.job_title,
+                    company_name=body.company_name,
+                    job_description=body.job_description,
+                    fit_score=fit_analysis.get("fit_score"),
+                    keyword_gaps=fit_analysis.get("keyword_gaps"),
+                    company_research=company_research,
+                    tailored_cv=written["tailored_cv"],
+                    tailored_cv_json=written["tailored_cv_json"],
+                    cover_letter=written["cover_letter"],
+                    tone_analysis=written.get("tone_analysis"),
+                    cv_version_name=cv_version_name,
+                    status=ApplicationStatus.draft,
+                )
+                db.add(application)
+                db.commit()
+                db.refresh(application)
+                app_id = application.id
         finally:
             db.close()
 
@@ -304,6 +349,7 @@ async def generate_application(
     # Resolve CV synchronously so we can fail fast on missing CV
     cv_text: str | None = None
     cv_links: list = []
+    cv_version_name: str | None = None
 
     if body.cv_version_id:
         cv_ver = (
@@ -314,6 +360,7 @@ async def generate_application(
         if not cv_ver:
             raise HTTPException(status_code=404, detail="CV version not found.")
         cv_text = cv_ver.cv_text
+        cv_version_name = cv_ver.name
     else:
         default_ver = (
             db.query(CVVersion)
@@ -322,6 +369,7 @@ async def generate_application(
         )
         if default_ver:
             cv_text = default_ver.cv_text
+            cv_version_name = default_ver.name
         else:
             cv_text = current_user.base_cv_text
             cv_links = current_user.cv_links or []
@@ -343,6 +391,7 @@ async def generate_application(
         cv_text=cv_text,
         cv_links=cv_links,
         user_preferences=user_preferences,
+        cv_version_name=cv_version_name,
     )
 
     return {"job_id": job_id}
@@ -487,6 +536,20 @@ def get_analytics(
         response_by_type=dict(type_counts),
         top_keywords_in_successful_apps=top_keywords,
     )
+
+
+@router.delete("/{application_id}", status_code=200)
+@limiter.limit(LIMITS["app_update"])
+def delete_application(
+    request: Request,
+    application_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    application = _get_application(application_id, current_user.id, db)
+    db.delete(application)
+    db.commit()
+    return {"id": application_id}
 
 
 @router.get("/{application_id}", response_model=ApplicationDetail)

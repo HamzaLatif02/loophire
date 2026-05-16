@@ -50,5 +50,6 @@ class Application(Base):
     interview_prep = Column(JSON, nullable=True)
     tone_analysis = Column(JSON, nullable=True)
     last_generated_at = Column(DateTime(timezone=True), nullable=True)
+    cv_version_name = Column(String, nullable=True)
 
     user = relationship("User", back_populates="applications")

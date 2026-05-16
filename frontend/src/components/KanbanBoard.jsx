@@ -1,6 +1,7 @@
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import DeleteButton from './DeleteButton'
 import { KEYS } from '../hooks/useApplications'
 import api from '../utils/api'
 
@@ -146,22 +147,34 @@ function KanbanCard({ app, index }) {
           <p className="text-sm font-medium text-[var(--color-text)] mb-0.5 leading-tight">
             {app.company_name}
           </p>
-          <p className="text-xs text-[var(--color-muted)] mb-3 leading-tight line-clamp-2">
+          <p className="text-xs text-[var(--color-muted)] mb-1 leading-tight line-clamp-2">
             {app.job_title}
           </p>
+          {app.cv_version_name && (
+            <p className="text-xs text-[var(--color-muted)] mb-3 truncate">
+              <span className="opacity-60">CV:</span> {app.cv_version_name}
+            </p>
+          )}
+          {!app.cv_version_name && <div className="mb-3" />}
 
-          {/* Footer: date + view link */}
+          {/* Footer: date + view link + delete */}
           <div className="flex justify-between items-center pt-2 border-t border-[var(--color-border)]">
             <span className="text-xs text-[var(--color-muted)] tabular-nums">
               {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
             </span>
-            <Link
-              to={`/applications/${app.id}`}
-              onClick={e => e.stopPropagation()}
-              className="text-xs font-medium text-blue-400 hover:underline"
-            >
-              View →
-            </Link>
+            <div className="flex items-center gap-2">
+              <DeleteButton
+                applicationId={app.id}
+                className="px-1.5 py-0.5 rounded border text-xs"
+              />
+              <Link
+                to={`/applications/${app.id}`}
+                onClick={e => e.stopPropagation()}
+                className="text-xs font-medium text-blue-400 hover:underline"
+              >
+                View →
+              </Link>
+            </div>
           </div>
 
           {/* Interview date badge */}

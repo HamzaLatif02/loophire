@@ -5,6 +5,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
+import DeleteButton from '../components/DeleteButton'
 import ErrorBanner from '../components/ErrorBanner'
 import KanbanBoard from '../components/KanbanBoard'
 import {
@@ -324,12 +325,23 @@ export default function DashboardPage() {
                             {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
-                        <button
-                          onClick={() => navigate(`/applications/${app.id}`)}
-                          className="w-full py-2 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
-                        >
-                          View →
-                        </button>
+                        {app.cv_version_name && (
+                          <p className="text-xs text-[var(--color-muted)] truncate">
+                            CV: <span className="text-[var(--color-text)]">{app.cv_version_name}</span>
+                          </p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => navigate(`/applications/${app.id}`)}
+                            className="flex-1 py-2 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                          >
+                            View →
+                          </button>
+                          <DeleteButton
+                            applicationId={app.id}
+                            className="px-3 py-2 rounded-lg border text-xs font-medium"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -343,6 +355,7 @@ export default function DashboardPage() {
                           <Th>Job Title</Th>
                           <SortTh label="Fit Score" field="fit_score" active={sortField} dir={sortDir} onSort={toggleSort} />
                           <Th>Status</Th>
+                          <Th>CV Used</Th>
                           <SortTh label="Date" field="created_at" active={sortField} dir={sortDir} onSort={toggleSort} />
                           <Th align="right">Actions</Th>
                         </tr>
@@ -380,18 +393,27 @@ export default function DashboardPage() {
                                 {app.status}
                               </span>
                             </td>
+                            <td className="px-5 py-3.5 text-[var(--color-muted)] text-xs max-w-[120px] truncate">
+                              {app.cv_version_name ?? <span className="opacity-40">—</span>}
+                            </td>
                             <td className="px-5 py-3.5 text-[var(--color-muted)] tabular-nums text-xs whitespace-nowrap">
                               {new Date(app.created_at).toLocaleDateString('en-GB', {
                                 day: 'numeric', month: 'short', year: 'numeric',
                               })}
                             </td>
                             <td className="px-5 py-3.5 text-right">
-                              <button
-                                onClick={() => navigate(`/applications/${app.id}`)}
-                                className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
-                              >
-                                View →
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => navigate(`/applications/${app.id}`)}
+                                  className="px-3 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
+                                >
+                                  View →
+                                </button>
+                                <DeleteButton
+                                  applicationId={app.id}
+                                  className="px-2.5 py-1 rounded-md border text-xs font-medium"
+                                />
+                              </div>
                             </td>
                           </tr>
                         ))}

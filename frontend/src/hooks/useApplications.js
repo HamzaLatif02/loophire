@@ -82,6 +82,30 @@ export function useUpdateNotes() {
   })
 }
 
+export function useDeleteApplication() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.delete(`/applications/${id}`),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: KEYS.applications })
+      const previous = queryClient.getQueryData(KEYS.applications)
+      queryClient.setQueryData(KEYS.applications, (old) =>
+        old ? old.filter((a) => a.id !== id) : old
+      )
+      return { previous }
+    },
+    onError: (_, __, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(KEYS.applications, context.previous)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.applications })
+      queryClient.invalidateQueries({ queryKey: KEYS.analytics })
+    },
+  })
+}
+
 export function useInvalidateApplications() {
   const queryClient = useQueryClient()
   return () => {

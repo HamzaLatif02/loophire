@@ -15,6 +15,7 @@ class ApplicationGenerateRequest(BaseModel):
     company_name: str
     job_description: str
     cv_version_id: Optional[int] = None
+    existing_application_id: Optional[int] = None
 
     @field_validator("job_title")
     @classmethod
@@ -65,6 +66,7 @@ class ApplicationSummary(BaseModel):
     got_response: bool = False
     response_type: Optional[str] = None
     notes: Optional[str] = None
+    cv_version_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -92,6 +94,7 @@ class ApplicationDetail(BaseModel):
     interview_prep: Optional[Dict[str, Any]] = None
     tone_analysis: Optional[Dict[str, Any]] = None
     last_generated_at: Optional[datetime] = None
+    cv_version_name: Optional[str] = None
     created_at: datetime
 
     class Config:

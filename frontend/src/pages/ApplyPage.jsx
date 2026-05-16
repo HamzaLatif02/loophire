@@ -89,6 +89,7 @@ export default function ApplyPage() {
     try {
       const payload = { ...form }
       if (selectedCvId) payload.cv_version_id = selectedCvId
+      if (jobId) payload.existing_application_id = Number(jobId)
       const res = await api.post('/applications/generate', payload)
       connect(res.data.job_id)
       setIsGenerating(true)

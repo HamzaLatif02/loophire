@@ -8,6 +8,7 @@ import GenerationProgress from '../components/GenerationProgress'
 import NotesEditor from '../components/NotesEditor'
 import { ApplicationDetailSkeleton } from '../components/skeletons/ApplicationDetailSkeleton'
 import Spinner from '../components/Spinner'
+import DeleteButton from '../components/DeleteButton'
 import { KEYS, useApplication, useUpdateApplication, useUpdateStatus } from '../hooks/useApplications'
 import { useGenerationProgress } from '../hooks/useGenerationProgress'
 import api from '../utils/api'
@@ -308,6 +309,11 @@ export default function ApplicationDetailPage() {
                   · Last generated: {relativeTime(app.last_generated_at)}
                 </span>
               )}
+              {app.cv_version_name && (
+                <span className="ml-3 text-[var(--color-muted)]">
+                  · CV: <span className="text-[var(--color-text)]">{app.cv_version_name}</span>
+                </span>
+              )}
             </p>
             {app.notes && (
               <p
@@ -319,18 +325,25 @@ export default function ApplicationDetailPage() {
             )}
           </div>
 
-          {/* regenerate button */}
-          <button
-            onClick={() => setShowRegenModal(true)}
-            disabled={isRegenerating}
-            title="Re-run the full generation pipeline"
-            className="flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors w-full md:w-auto"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            Regenerate
-          </button>
+          {/* action buttons */}
+          <div className="flex gap-2 w-full md:w-auto">
+            <button
+              onClick={() => setShowRegenModal(true)}
+              disabled={isRegenerating}
+              title="Re-run the full generation pipeline"
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+              </svg>
+              Regenerate
+            </button>
+            <DeleteButton
+              applicationId={Number(id)}
+              onDeleted={() => navigate('/applications')}
+              className="flex-1 md:flex-none px-3 py-2 md:py-1.5 rounded-lg border text-xs font-medium"
+            />
+          </div>
 
           {/* status dropdown */}
           <div className="md:shrink-0" ref={dropdownRef}>
