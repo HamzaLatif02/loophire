@@ -323,6 +323,21 @@ export default function ApplicationDetailPage() {
                 📝 {app.notes.split('\n')[0]}
               </p>
             )}
+            <div className="flex gap-2 flex-wrap mt-2">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-2)] text-[var(--color-muted)]">
+                Fit score ✓
+              </span>
+              {app.rewrite_cv && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-2)] text-[var(--color-muted)]">
+                  CV rewritten ✓
+                </span>
+              )}
+              {app.cover_letter_generated && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-2)] text-[var(--color-muted)]">
+                  Cover letter ✓
+                </span>
+              )}
+            </div>
           </div>
 
           {/* action buttons */}
@@ -506,21 +521,67 @@ export default function ApplicationDetailPage() {
         </div>
 
         {activeTab === 0 && (
-          <CVEditor
-            value={app.tailored_cv_json}
-            onSave={(updatedJson) => patchApplication({ tailored_cv_json: updatedJson })}
-            exportUrl={`/api/applications/${id}/export/cv`}
-            exportFilename={`tailored_cv_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
-          />
+          app.tailored_cv_json || app.tailored_cv
+            ? (
+              <CVEditor
+                value={app.tailored_cv_json}
+                onSave={(updatedJson) => patchApplication({ tailored_cv_json: updatedJson })}
+                exportUrl={`/api/applications/${id}/export/cv`}
+                exportFilename={`tailored_cv_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 gap-5 text-center">
+                <div className="w-14 h-14 rounded-full bg-[var(--color-surface-2)] border border-[var(--color-border)] flex items-center justify-center">
+                  <svg className="w-7 h-7 text-[var(--color-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">CV was not rewritten</p>
+                  <p className="text-xs text-[var(--color-muted)] mt-1 max-w-xs leading-relaxed">
+                    This application was generated without CV tailoring. Regenerate with "Rewrite CV" enabled to get a tailored version.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowRegenModal(true)}
+                  className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-semibold transition-colors"
+                >
+                  Regenerate with CV rewrite
+                </button>
+              </div>
+            )
         )}
         {activeTab === 1 && (
-          <EditableTextArea
-            value={app.cover_letter}
-            onSave={(text) => patchApplication({ cover_letter: text })}
-            exportUrl={`/api/applications/${id}/export/cover-letter`}
-            exportFilename={`cover_letter_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
-            emptyMsg="No cover letter was generated for this application."
-          />
+          app.cover_letter
+            ? (
+              <EditableTextArea
+                value={app.cover_letter}
+                onSave={(text) => patchApplication({ cover_letter: text })}
+                exportUrl={`/api/applications/${id}/export/cover-letter`}
+                exportFilename={`cover_letter_${app.company_name.toLowerCase().replace(/\s+/g, '_')}.pdf`}
+                emptyMsg="No cover letter was generated for this application."
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 gap-5 text-center">
+                <div className="w-14 h-14 rounded-full bg-[var(--color-surface-2)] border border-[var(--color-border)] flex items-center justify-center">
+                  <svg className="w-7 h-7 text-[var(--color-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">No cover letter generated</p>
+                  <p className="text-xs text-[var(--color-muted)] mt-1 max-w-xs leading-relaxed">
+                    This application was generated without a cover letter. Regenerate to add one.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowRegenModal(true)}
+                  className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-semibold transition-colors"
+                >
+                  Regenerate with cover letter
+                </button>
+              </div>
+            )
         )}
         {activeTab === 2 && (
           <AnalysisPanel app={app} score={score} color={color} fitLabel={fitLabel} />

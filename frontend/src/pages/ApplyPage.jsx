@@ -37,6 +37,10 @@ export default function ApplyPage() {
     if (isComplete) invalidateApplications()
   }, [isComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── generation mode flags ────────────────────────────────────────────────────
+  const [rewriteCv, setRewriteCv]                         = useState(true)
+  const [generateCoverLetter, setGenerateCoverLetter]     = useState(true)
+
   // ── form ────────────────────────────────────────────────────────────────────
   const [form, setForm]         = useState({ job_title: '', company_name: '', job_description: '' })
   const [formError, setFormError] = useState('')
@@ -87,7 +91,11 @@ export default function ApplyPage() {
     setFormError('')
     reset()
     try {
-      const payload = { ...form }
+      const payload = {
+        ...form,
+        rewrite_cv:            rewriteCv,
+        generate_cover_letter: generateCoverLetter,
+      }
       if (selectedCvId) payload.cv_version_id = selectedCvId
       if (jobId) payload.existing_application_id = Number(jobId)
       const res = await api.post('/applications/generate', payload)
@@ -311,6 +319,8 @@ export default function ApplyPage() {
           error={wsError}
           applicationId={applicationId}
           onReset={() => { setIsGenerating(false); reset() }}
+          rewriteCv={rewriteCv}
+          generateCoverLetter={generateCoverLetter}
         />
       )}
 
@@ -380,6 +390,86 @@ export default function ApplyPage() {
           />
         </Field>
 
+        {/* ── Generation options ── */}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 space-y-4">
+          <p className="text-sm font-semibold text-[var(--color-text)]">What do you want to generate?</p>
+
+          {/* Always-included items */}
+          <div className="space-y-2">
+            {[
+              'Fit score & keyword gap analysis',
+              'Company research & tone analysis',
+            ].map((label) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className="w-4 h-4 rounded flex items-center justify-center bg-[var(--color-accent)]/20 text-[var(--color-accent)] text-xs shrink-0">✓</span>
+                <span className="text-sm text-[var(--color-muted)]">{label}</span>
+                <span className="ml-auto text-xs text-[var(--color-border)] shrink-0">Always included</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-[var(--color-border)]" />
+
+          {/* Toggleable options */}
+          <div className="space-y-3">
+            {[
+              {
+                key: 'cv', value: rewriteCv, toggle: () => setRewriteCv((v) => !v),
+                label: 'Rewrite CV',
+                desc: 'Tailor your CV to match this job description and fill keyword gaps',
+              },
+              {
+                key: 'cl', value: generateCoverLetter, toggle: () => setGenerateCoverLetter((v) => !v),
+                label: 'Generate cover letter',
+                desc: 'Write a personalised cover letter based on the role and company research',
+              },
+            ].map(({ key, value, toggle, label, desc }) => (
+              <div
+                key={key}
+                onClick={toggle}
+                className="flex items-start gap-3 cursor-pointer group"
+              >
+                <div className={`mt-0.5 w-5 h-5 rounded shrink-0 flex items-center justify-center border-2 transition-all ${
+                  value
+                    ? 'bg-[var(--color-accent)] border-[var(--color-accent)]'
+                    : 'bg-transparent border-[var(--color-border)] group-hover:border-[var(--color-accent)]'
+                }`}>
+                  {value && <span className="text-white text-xs font-bold leading-none">✓</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[var(--color-text)]">{label}</p>
+                  <p className="text-xs text-[var(--color-muted)] mt-0.5">{desc}</p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${
+                  value
+                    ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+                    : 'bg-[var(--color-surface)] text-[var(--color-muted)]'
+                }`}>
+                  {value ? 'On' : 'Off'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Cost estimate */}
+          <div className="pt-2 border-t border-[var(--color-border)] flex justify-between items-center text-xs">
+            <span className="text-[var(--color-muted)]">Estimated API usage:</span>
+            <span className={`font-medium ${
+              !rewriteCv && !generateCoverLetter
+                ? 'text-[var(--color-success)]'
+                : rewriteCv && generateCoverLetter
+                ? 'text-[var(--color-accent)]'
+                : 'text-yellow-400'
+            }`}>
+              {!rewriteCv && !generateCoverLetter
+                ? 'Low — fit check only'
+                : !rewriteCv || !generateCoverLetter
+                ? 'Medium — partial generation'
+                : 'Full — all features'}
+            </span>
+          </div>
+        </div>
+
         <ErrorBanner message={formError} onDismiss={() => setFormError('')} />
 
         <button
@@ -387,7 +477,13 @@ export default function ApplyPage() {
           disabled={isGenerating}
           className="w-full py-3 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors"
         >
-          Generate Application →
+          {!rewriteCv && !generateCoverLetter
+            ? 'Analyse fit →'
+            : !rewriteCv
+            ? 'Generate cover letter →'
+            : !generateCoverLetter
+            ? 'Rewrite CV →'
+            : 'Generate application →'}
         </button>
       </form>
 

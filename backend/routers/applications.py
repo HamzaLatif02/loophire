@@ -73,43 +73,69 @@ async def run_generation_pipeline(
     cv_version_name: Optional[str] = None,
 ):
     p = progress_manager
+    do_write = body.rewrite_cv or body.generate_cover_letter
     # Brief pause so the WebSocket client has time to connect
     await asyncio.sleep(0.4)
 
     try:
         await p.send_progress(job_id, "cv", "CV loaded.", 8)
 
-        await p.send_progress(job_id, "research", "Researching the company…", 18)
+        await p.send_progress(job_id, "research", "Researching the company…", 20)
         try:
             company_research = await asyncio.to_thread(research_company, body.company_name)
         except Exception:
             company_research = None
 
-        await p.send_progress(job_id, "tone", "Analysing job description tone…", 34)
+        await p.send_progress(job_id, "tone", "Analysing job description tone…", 36)
         tone_result: Optional[dict] = None
         try:
             tone_result = await asyncio.to_thread(analyse_tone, body.job_description)
         except Exception as exc:
             logger.warning("pipeline[%s]: tone analysis failed (non-fatal): %s", job_id, exc)
 
-        await p.send_progress(job_id, "fit", "Scoring your fit for this role…", 50)
+        await p.send_progress(job_id, "fit", "Scoring your fit for this role…", 54)
         fit_analysis = await asyncio.to_thread(analyse_fit, cv_text, body.job_description)
 
-        await p.send_progress(job_id, "cv_tailor", "Tailoring your CV…", 66)
-        written = await asyncio.to_thread(
-            write_application,
-            cv_text=cv_text,
-            job_description=body.job_description,
-            fit_analysis=fit_analysis,
-            company_research=company_research,
-            user_preferences=user_preferences,
-            cv_links=cv_links,
-            tone_analysis=tone_result,
-        )
-
-        await p.send_progress(job_id, "cover_letter", "Cover letter written.", 84)
+        written: Optional[dict] = None
+        if do_write:
+            if body.rewrite_cv:
+                await p.send_progress(job_id, "cv_tailor", "Tailoring your CV…", 68)
+            else:
+                await p.send_progress(job_id, "cover_letter", "Writing cover letter…", 68)
+            written = await asyncio.to_thread(
+                write_application,
+                cv_text=cv_text,
+                job_description=body.job_description,
+                fit_analysis=fit_analysis,
+                company_research=company_research,
+                user_preferences=user_preferences,
+                cv_links=cv_links,
+                tone_analysis=tone_result,
+            )
+            if body.rewrite_cv and body.generate_cover_letter:
+                await p.send_progress(job_id, "cover_letter", "Cover letter written.", 84)
 
         await p.send_progress(job_id, "saving", "Saving your application…", 93)
+
+        # Build shared kwargs for application fields
+        app_fields: dict = {
+            "job_title":               body.job_title,
+            "company_name":            body.company_name,
+            "job_description":         body.job_description,
+            "fit_score":               fit_analysis.get("fit_score"),
+            "keyword_gaps":            fit_analysis.get("keyword_gaps"),
+            "company_research":        company_research,
+            "tone_analysis":           tone_result,
+            "cv_version_name":         cv_version_name,
+            "rewrite_cv":              body.rewrite_cv,
+            "cover_letter_generated":  body.generate_cover_letter,
+        }
+        if written and body.rewrite_cv:
+            app_fields["tailored_cv"]      = written.get("tailored_cv")
+            app_fields["tailored_cv_json"] = written.get("tailored_cv_json")
+        if written and body.generate_cover_letter:
+            app_fields["cover_letter"] = written.get("cover_letter")
+
         db = SessionLocal()
         try:
             if body.existing_application_id:
@@ -118,37 +144,15 @@ async def run_generation_pipeline(
                     Application.user_id == user_id,
                 ).first()
                 if application:
-                    application.job_title        = body.job_title
-                    application.company_name     = body.company_name
-                    application.job_description  = body.job_description
-                    application.fit_score        = fit_analysis.get("fit_score")
-                    application.keyword_gaps     = fit_analysis.get("keyword_gaps")
-                    application.company_research = company_research
-                    application.tailored_cv      = written["tailored_cv"]
-                    application.tailored_cv_json = written["tailored_cv_json"]
-                    application.cover_letter     = written["cover_letter"]
-                    application.tone_analysis    = written.get("tone_analysis")
-                    application.cv_version_name  = cv_version_name
+                    for k, v in app_fields.items():
+                        setattr(application, k, v)
                     application.last_generated_at = datetime.now(timezone.utc)
                     db.commit()
                     db.refresh(application)
                     app_id = application.id
                 else:
-                    # Fall back to creating if the referenced application no longer exists
                     application = Application(
-                        user_id=user_id,
-                        job_title=body.job_title,
-                        company_name=body.company_name,
-                        job_description=body.job_description,
-                        fit_score=fit_analysis.get("fit_score"),
-                        keyword_gaps=fit_analysis.get("keyword_gaps"),
-                        company_research=company_research,
-                        tailored_cv=written["tailored_cv"],
-                        tailored_cv_json=written["tailored_cv_json"],
-                        cover_letter=written["cover_letter"],
-                        tone_analysis=written.get("tone_analysis"),
-                        cv_version_name=cv_version_name,
-                        status=ApplicationStatus.draft,
+                        user_id=user_id, status=ApplicationStatus.draft, **app_fields
                     )
                     db.add(application)
                     db.commit()
@@ -156,19 +160,7 @@ async def run_generation_pipeline(
                     app_id = application.id
             else:
                 application = Application(
-                    user_id=user_id,
-                    job_title=body.job_title,
-                    company_name=body.company_name,
-                    job_description=body.job_description,
-                    fit_score=fit_analysis.get("fit_score"),
-                    keyword_gaps=fit_analysis.get("keyword_gaps"),
-                    company_research=company_research,
-                    tailored_cv=written["tailored_cv"],
-                    tailored_cv_json=written["tailored_cv_json"],
-                    cover_letter=written["cover_letter"],
-                    tone_analysis=written.get("tone_analysis"),
-                    cv_version_name=cv_version_name,
-                    status=ApplicationStatus.draft,
+                    user_id=user_id, status=ApplicationStatus.draft, **app_fields
                 )
                 db.add(application)
                 db.commit()

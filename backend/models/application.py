@@ -51,5 +51,7 @@ class Application(Base):
     tone_analysis = Column(JSON, nullable=True)
     last_generated_at = Column(DateTime(timezone=True), nullable=True)
     cv_version_name = Column(String, nullable=True)
+    rewrite_cv = Column(Boolean, nullable=False, default=True, server_default='true')
+    cover_letter_generated = Column(Boolean, nullable=False, default=True, server_default='true')
 
     user = relationship("User", back_populates="applications")

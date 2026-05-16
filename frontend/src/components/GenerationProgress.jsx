@@ -2,9 +2,10 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { STAGES } from '../hooks/useGenerationProgress'
 
-const STAGE_ORDER = ['cv', 'research', 'tone', 'fit', 'cv_tailor', 'cover_letter', 'saving']
-
-export default function GenerationProgress({ progress, isComplete, error, applicationId, onReset }) {
+export default function GenerationProgress({
+  progress, isComplete, error, applicationId, onReset,
+  rewriteCv = true, generateCoverLetter = true,
+}) {
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -13,6 +14,17 @@ export default function GenerationProgress({ progress, isComplete, error, applic
       return () => clearTimeout(t)
     }
   }, [isComplete, applicationId, navigate])
+
+  // Build the stage checklist dynamically based on what was requested
+  const stageList = [
+    { key: 'cv',      label: 'Loading CV' },
+    { key: 'research', label: 'Company research' },
+    { key: 'tone',    label: 'Tone analysis' },
+    { key: 'fit',     label: 'Fit scoring' },
+    ...(rewriteCv ? [{ key: 'cv_tailor', label: 'CV tailoring' }] : []),
+    ...(generateCoverLetter ? [{ key: 'cover_letter', label: 'Cover letter' }] : []),
+    { key: 'saving',  label: 'Saving' },
+  ]
 
   if (error) {
     return (
@@ -38,7 +50,7 @@ export default function GenerationProgress({ progress, isComplete, error, applic
     )
   }
 
-  const currentIdx = STAGE_ORDER.indexOf(progress.stage)
+  const currentIdx = stageList.findIndex((s) => s.key === progress.stage)
 
   return (
     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
@@ -70,7 +82,7 @@ export default function GenerationProgress({ progress, isComplete, error, applic
 
         {/* Stage checklist */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center px-2">
-          {STAGE_ORDER.map((key, idx) => {
+          {stageList.map(({ key, label }, idx) => {
             const isDone    = isComplete || idx < currentIdx
             const isCurrent = !isComplete && key === progress.stage
             return (
@@ -87,9 +99,9 @@ export default function GenerationProgress({ progress, isComplete, error, applic
                   : isCurrent ? 'text-[var(--color-text)] font-medium'
                   : 'text-[var(--color-border)]'
                 }`}>
-                  {STAGES[key]?.label ?? key}
+                  {STAGES[key]?.label ?? label}
                 </span>
-                {idx < STAGE_ORDER.length - 1 && (
+                {idx < stageList.length - 1 && (
                   <span className="text-[var(--color-border)] text-[10px] sm:text-xs hidden sm:inline">›</span>
                 )}
               </div>

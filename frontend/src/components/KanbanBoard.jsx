@@ -151,11 +151,21 @@ function KanbanCard({ app, index }) {
             {app.job_title}
           </p>
           {app.cv_version_name && (
-            <p className="text-xs text-[var(--color-muted)] mb-3 truncate">
+            <p className="text-xs text-[var(--color-muted)] mb-1 truncate">
               <span className="opacity-60">CV:</span> {app.cv_version_name}
             </p>
           )}
-          {!app.cv_version_name && <div className="mb-3" />}
+          <div className="flex gap-1 flex-wrap mb-3">
+            {app.rewrite_cv && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]">CV</span>
+            )}
+            {app.cover_letter_generated && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]">Letter</span>
+            )}
+            {!app.rewrite_cv && !app.cover_letter_generated && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]">Fit only</span>
+            )}
+          </div>
 
           {/* Footer: date + view link + delete */}
           <div className="flex justify-between items-center pt-2 border-t border-[var(--color-border)]">

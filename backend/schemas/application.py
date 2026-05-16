@@ -16,6 +16,8 @@ class ApplicationGenerateRequest(BaseModel):
     job_description: str
     cv_version_id: Optional[int] = None
     existing_application_id: Optional[int] = None
+    rewrite_cv: bool = True
+    generate_cover_letter: bool = True
 
     @field_validator("job_title")
     @classmethod
@@ -67,6 +69,8 @@ class ApplicationSummary(BaseModel):
     response_type: Optional[str] = None
     notes: Optional[str] = None
     cv_version_name: Optional[str] = None
+    rewrite_cv: bool = True
+    cover_letter_generated: bool = True
 
     class Config:
         from_attributes = True
@@ -95,6 +99,8 @@ class ApplicationDetail(BaseModel):
     tone_analysis: Optional[Dict[str, Any]] = None
     last_generated_at: Optional[datetime] = None
     cv_version_name: Optional[str] = None
+    rewrite_cv: bool = True
+    cover_letter_generated: bool = True
     created_at: datetime
 
     class Config:
