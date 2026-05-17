@@ -5,6 +5,7 @@ export const KEYS = {
   applications: ['applications'],
   application:  (id) => ['applications', String(id)],
   analytics:    ['analytics'],
+  cvVersions:   ['cv-versions'],
 }
 
 export function useApplications() {
@@ -102,6 +103,16 @@ export function useDeleteApplication() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: KEYS.applications })
       queryClient.invalidateQueries({ queryKey: KEYS.analytics })
+    },
+  })
+}
+
+export function useCVVersions() {
+  return useQuery({
+    queryKey: KEYS.cvVersions,
+    queryFn:  async () => {
+      const { data } = await api.get('/cvs')
+      return data
     },
   })
 }

@@ -26,6 +26,8 @@ class CVVersionOut(BaseModel):
     name: str
     is_default: bool
     characters: int
+    cv_text: str
+    word_count: int
     created_at: str
 
     class Config:
@@ -41,11 +43,14 @@ def _clear_default(user_id: int, db: Session) -> None:
 
 
 def _to_out(cv: CVVersion) -> CVVersionOut:
+    text = cv.cv_text or ""
     return CVVersionOut(
         id=cv.id,
         name=cv.name,
         is_default=cv.is_default,
-        characters=len(cv.cv_text),
+        characters=len(text),
+        cv_text=text,
+        word_count=len(text.split()),
         created_at=cv.created_at.isoformat(),
     )
 
