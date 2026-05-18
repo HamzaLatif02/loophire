@@ -10,11 +10,17 @@ export default function CVViewer({ cv, onClose, onPrev, onNext, currentIndex, to
 
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'ArrowUp'   || e.key === 'k') onPrev()
-      if (e.key === 'ArrowDown' || e.key === 'j') onNext()
+      const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
+      const tag = document.activeElement?.tagName
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable
+
+      if (arrowKeys.includes(e.key) && !isTyping) e.preventDefault()
+
+      if ((e.key === 'ArrowUp'   || e.key === 'k') && !isTyping) onPrev()
+      if ((e.key === 'ArrowDown' || e.key === 'j') && !isTyping) onNext()
       if (e.key === 'Escape') onClose()
     }
-    window.addEventListener('keydown', handleKey)
+    window.addEventListener('keydown', handleKey, { passive: false })
     return () => window.removeEventListener('keydown', handleKey)
   }, [onPrev, onNext, onClose])
 
