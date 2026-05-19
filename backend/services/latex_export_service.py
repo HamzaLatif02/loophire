@@ -18,10 +18,11 @@ KNOWN_LIVE_SITES = {
 }
 
 
-def generate_cv_pdf(tailored_content: dict) -> bytes:
+def generate_cv_pdf(tailored_content: dict, template_id: str = "classic") -> bytes:
     """
-    Render a structured CV dict as a PDF using Hamza's LaTeX template.
+    Render a structured CV dict as a PDF.
 
+    template_id: "classic" | "minimal" | "two_column" | "compact"
     tailored_content keys:
       profile          str
       technical_skills list of {category, items}
@@ -29,7 +30,12 @@ def generate_cv_pdf(tailored_content: dict) -> bytes:
       experience       list of {title, company, dates, highlights}
       projects         list of {name, github_url, live_url, highlights}
     """
-    latex = build_latex(tailored_content)
+    # Lazy import avoids circular dependency between this module and cv_templates
+    from services.cv_templates import build_latex_for_template
+    if template_id and template_id != "classic":
+        latex = build_latex_for_template(template_id, tailored_content)
+    else:
+        latex = build_latex(tailored_content)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tex_path = os.path.join(tmpdir, "cv.tex")

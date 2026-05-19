@@ -14,6 +14,7 @@ class CVVersion(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     name       = Column(String, nullable=False)
     cv_text    = Column(Text, nullable=False)
-    is_default = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_default  = Column(Boolean, nullable=False, default=False, server_default="false")
+    template_id = Column(String, nullable=True)
 
     user = relationship("User", back_populates="cv_versions")

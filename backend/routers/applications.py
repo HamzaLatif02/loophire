@@ -718,21 +718,32 @@ async def debug_latex_process(
 def export_cv(
     request: Request,
     application_id: int,
+    template_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     app = _get_application(application_id, current_user.id, db)
     if not app.tailored_cv_json:
         raise HTTPException(status_code=404, detail="No tailored CV available for this application.")
+
+    # Determine effective template: explicit override > CV version default > classic
+    effective_template = "classic"
+    if template_id:
+        effective_template = template_id
+    elif app.cv_version_id:
+        cv_ver = db.query(CVVersion).filter(CVVersion.id == app.cv_version_id).first()
+        if cv_ver and cv_ver.template_id:
+            effective_template = cv_ver.template_id
+
     try:
-        pdf = generate_cv_pdf(app.tailored_cv_json)
+        pdf = generate_cv_pdf(app.tailored_cv_json, template_id=effective_template)
     except RuntimeError as exc:
         logger.error("LaTeX PDF generation failed for application %d: %s", application_id, exc)
         raise HTTPException(
             status_code=500,
             detail="PDF generation failed — please try again or contact support",
         )
-    filename = f"tailored_cv_{_safe_filename(app.company_name)}.pdf"
+    filename = f"tailored_cv_{_safe_filename(app.company_name)}_{effective_template}.pdf"
     return Response(
         content=pdf,
         media_type="application/pdf",
