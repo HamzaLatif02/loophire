@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import usePdfAction from '../hooks/usePdfAction'
 
 export default function CVViewer({ cv, onClose, onPrev, onNext, currentIndex, total }) {
   const scrollRef = useRef(null)
   const [copied, setCopied] = useState(false)
+  const { loading: previewing, openInNewTab: previewPdf } = usePdfAction()
+  const { loading: downloading, download: downloadPdf }   = usePdfAction()
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0
@@ -29,6 +32,9 @@ export default function CVViewer({ cv, onClose, onPrev, onNext, currentIndex, to
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const handlePreviewPdf = () => previewPdf(`/cvs/${cv.id}/preview-pdf`)
+  const handleDownloadPdf = () => downloadPdf(`/cvs/${cv.id}/download-pdf`, `${cv.name}_${cv.template_id || 'classic'}.pdf`)
 
   const wordCount = cv.word_count || (cv.cv_text || '').split(/\s+/).filter(Boolean).length
 
@@ -64,12 +70,35 @@ export default function CVViewer({ cv, onClose, onPrev, onNext, currentIndex, to
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[var(--color-text)] truncate">{cv.name}</p>
-          <p className="text-xs text-[var(--color-muted)]">
-            {currentIndex + 1} of {total} · {wordCount.toLocaleString()} words
-          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <p className="text-xs text-[var(--color-muted)]">
+              {currentIndex + 1} of {total} · {wordCount.toLocaleString()} words
+            </p>
+            {cv.template_id && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]">
+                {cv.template_id}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={handlePreviewPdf}
+            disabled={previewing}
+            title="Open PDF in new tab"
+            className="px-2.5 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
+          >
+            {previewing ? 'Opening…' : 'Preview PDF'}
+          </button>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            title="Download PDF"
+            className="px-2.5 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
+          >
+            {downloading ? 'Downloading…' : 'Download PDF'}
+          </button>
           <button
             onClick={handleCopy}
             title="Copy CV text"

@@ -1,7 +1,10 @@
+import asyncio
+import json
 import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -11,6 +14,7 @@ from models.cv_version import CVVersion
 from models.user import User
 from services.cv_parser import parse_pdf_with_links
 from services.cv_templates import TEMPLATES, detect_template
+from services.latex_export_service import generate_cv_pdf
 from utils.rate_limiter import LIMITS, limiter
 
 logger = logging.getLogger(__name__)
@@ -197,6 +201,129 @@ def update_cv_template(
     cv.template_id = resolved
     db.commit()
     return {"id": cv_id, "template_id": resolved}
+
+
+def _structure_cv_sync(cv_text: str) -> dict:
+    """Call Claude Haiku to parse raw CV text into structured JSON for LaTeX rendering."""
+    import anthropic
+
+    client = anthropic.Anthropic()
+    prompt = (
+        "Parse this CV text into structured JSON.\n"
+        "Return ONLY valid JSON — no markdown fences, no prose.\n\n"
+        "Required format:\n"
+        '{"profile":"...","technical_skills":[{"category":"...","items":"..."}],'
+        '"education":[{"institution":"...","degree":"...","dates":"...","highlights":["..."]}],'
+        '"experience":[{"title":"...","company":"...","dates":"...","highlights":["..."]}],'
+        '"projects":[{"name":"...","github_url":"","highlights":["..."]}]}\n\n'
+        f"CV text:\n{cv_text[:8000]}"
+    )
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=4000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = response.content[0].text.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```", 2)
+        raw = parts[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.rsplit("```", 1)[0]
+    raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {
+            "profile": cv_text[:500],
+            "technical_skills": [],
+            "education": [],
+            "experience": [],
+            "projects": [],
+        }
+
+
+async def _get_cv_content(cv: CVVersion, db: Session) -> dict:
+    """Return cv_json if cached, otherwise structure the raw text and cache it."""
+    if cv.cv_json:
+        return cv.cv_json
+    content = await asyncio.to_thread(_structure_cv_sync, cv.cv_text or "")
+    cv.cv_json = content
+    db.commit()
+    return content
+
+
+@router.get("/{cv_id}/preview-pdf")
+@limiter.limit(LIMITS["app_export_pdf"])
+async def preview_cv_pdf(
+    request: Request,
+    cv_id: int,
+    template_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate a PDF and stream it inline (for browser preview)."""
+    cv = db.query(CVVersion).filter(
+        CVVersion.id == cv_id, CVVersion.user_id == current_user.id
+    ).first()
+    if not cv:
+        raise HTTPException(status_code=404, detail="CV not found.")
+
+    effective_template = template_id or cv.template_id or "classic"
+    content = await _get_cv_content(cv, db)
+
+    try:
+        pdf_bytes = await asyncio.to_thread(generate_cv_pdf, content, effective_template)
+    except Exception as exc:
+        logger.error("PDF preview failed for cv %d: %s", cv_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="PDF preview failed. The CV text may not be compatible with the selected template.",
+        )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{cv.name}.pdf"',
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
+@router.get("/{cv_id}/download-pdf")
+@limiter.limit(LIMITS["app_export_pdf"])
+async def download_cv_pdf(
+    request: Request,
+    cv_id: int,
+    template_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate a PDF and force a file download."""
+    cv = db.query(CVVersion).filter(
+        CVVersion.id == cv_id, CVVersion.user_id == current_user.id
+    ).first()
+    if not cv:
+        raise HTTPException(status_code=404, detail="CV not found.")
+
+    effective_template = template_id or cv.template_id or "classic"
+    content = await _get_cv_content(cv, db)
+
+    try:
+        pdf_bytes = await asyncio.to_thread(generate_cv_pdf, content, effective_template)
+    except Exception as exc:
+        logger.error("PDF download failed for cv %d: %s", cv_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="PDF generation failed.")
+
+    safe_name = cv.name.replace(" ", "_")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}_{effective_template}.pdf"',
+        },
+    )
 
 
 @router.delete("/{cv_id}", status_code=204)

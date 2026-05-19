@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import DateTime
@@ -16,5 +16,6 @@ class CVVersion(Base):
     cv_text    = Column(Text, nullable=False)
     is_default  = Column(Boolean, nullable=False, default=False, server_default="false")
     template_id = Column(String, nullable=True)
+    cv_json     = Column(JSON, nullable=True)
 
     user = relationship("User", back_populates="cv_versions")

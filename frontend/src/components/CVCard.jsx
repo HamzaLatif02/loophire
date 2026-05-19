@@ -1,32 +1,47 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../utils/api'
 import { KEYS } from '../hooks/useApplications'
+import usePdfAction from '../hooks/usePdfAction'
+
+const TEMPLATE_OPTIONS = [
+  { id: 'auto',       name: 'Auto',       desc: 'Auto-detect best match' },
+  { id: 'classic',    name: 'Classic',    desc: 'Traditional single-column' },
+  { id: 'minimal',    name: 'Minimal',    desc: 'Clean, whitespace-focused' },
+  { id: 'two_column', name: 'Two Column', desc: 'Sidebar + main layout' },
+  { id: 'compact',    name: 'Compact',    desc: 'Dense, space-efficient' },
+]
 
 export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
   const queryClient = useQueryClient()
-  const [deleting, setDeleting]           = useState(false)
-  const [confirmDel, setConfirmDel]       = useState(false)
-  const [settingDefault, setSettingDefault] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
-  const [templates, setTemplates]         = useState([])
-  const [updating, setUpdating]           = useState(false)
+  const dropdownRef = useRef(null)
 
-  const loadTemplates = async () => {
-    if (templates.length > 0) { setShowTemplates(v => !v); return }
-    try {
-      const { data } = await api.get('/cvs/templates')
-      setTemplates(data)
-      setShowTemplates(true)
-    } catch { /* non-critical */ }
-  }
+  const [deleting, setDeleting]         = useState(false)
+  const [confirmDel, setConfirmDel]     = useState(false)
+  const [settingDefault, setSettingDefault] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [updating, setUpdating]         = useState(false)
+
+  const { loading: previewing, openInNewTab: previewPdf } = usePdfAction()
+  const { loading: downloading, download: downloadPdf }   = usePdfAction()
+
+  useEffect(() => {
+    if (!showDropdown) return
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showDropdown])
 
   const handleTemplateChange = async (newId) => {
     setUpdating(true)
     try {
       await api.patch(`/cvs/${cv.id}/template`, null, { params: { template_id: newId } })
       queryClient.invalidateQueries({ queryKey: KEYS.cvVersions })
-      setShowTemplates(false)
+      setShowDropdown(false)
     } finally {
       setUpdating(false)
     }
@@ -60,10 +75,22 @@ export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
     }
   }
 
+  const handlePreviewPdf = (e) => {
+    e.stopPropagation()
+    previewPdf(`/cvs/${cv.id}/preview-pdf`)
+  }
+
+  const handleDownloadPdf = (e) => {
+    e.stopPropagation()
+    const safeName = `${cv.name}_${cv.template_id || 'classic'}.pdf`
+    downloadPdf(`/cvs/${cv.id}/download-pdf`, safeName)
+  }
+
   const wordCount = cv.word_count || (cv.cv_text || '').split(/\s+/).filter(Boolean).length
   const uploadDate = new Date(cv.created_at).toLocaleDateString('en-GB', {
     day: 'numeric', month: 'short', year: 'numeric',
   })
+  const currentTemplate = TEMPLATE_OPTIONS.find(t => t.id === cv.template_id) || TEMPLATE_OPTIONS[1]
 
   return (
     <div
@@ -116,6 +143,22 @@ export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
           {isSelected ? '👁 Viewing' : '👁 View'}
         </button>
 
+        <button
+          onClick={handlePreviewPdf}
+          disabled={previewing}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors disabled:opacity-50"
+        >
+          {previewing ? 'Opening…' : 'Preview PDF'}
+        </button>
+
+        <button
+          onClick={handleDownloadPdf}
+          disabled={downloading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors disabled:opacity-50"
+        >
+          {downloading ? 'Downloading…' : 'Download PDF'}
+        </button>
+
         {!cv.is_default && (
           <button
             onClick={handleSetDefault}
@@ -139,31 +182,37 @@ export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
         </button>
       </div>
 
-      {/* Template switcher */}
-      <div className="mt-2 pt-2 border-t border-[var(--color-border)]" onClick={e => e.stopPropagation()}>
+      {/* Template dropdown */}
+      <div
+        ref={dropdownRef}
+        className="mt-2 pt-2 border-t border-[var(--color-border)] relative"
+        onClick={e => e.stopPropagation()}
+      >
         <button
-          onClick={loadTemplates}
-          className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] flex items-center gap-1.5 transition-colors"
+          onClick={() => setShowDropdown(v => !v)}
+          disabled={updating}
+          className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
         >
           <span>Template:</span>
-          <span className="text-[var(--color-text)]">{cv.template_id || 'classic'}</span>
-          <span className="text-[var(--color-muted)] ml-0.5">{showTemplates ? '▲' : '▼'}</span>
+          <span className="text-[var(--color-text)]">{currentTemplate.name}</span>
+          <span className="text-[var(--color-muted)] ml-0.5">{showDropdown ? '▲' : '▼'}</span>
         </button>
 
-        {showTemplates && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {[{ id: 'auto', name: 'Auto' }, ...templates].map(t => (
+        {showDropdown && (
+          <div className="absolute left-0 top-full mt-1 z-20 w-52 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg overflow-hidden">
+            {TEMPLATE_OPTIONS.map(t => (
               <button
                 key={t.id}
                 onClick={() => handleTemplateChange(t.id)}
                 disabled={updating}
-                className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
-                  cv.template_id === t.id
-                    ? 'bg-[var(--color-accent)] text-white'
-                    : 'bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                className={`w-full text-left px-3 py-2.5 flex flex-col gap-0.5 transition-colors ${
+                  cv.template_id === t.id || (t.id === 'classic' && !cv.template_id)
+                    ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+                    : 'text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
                 }`}
               >
-                {t.name}
+                <span className="text-xs font-medium">{t.name}</span>
+                <span className="text-xs text-[var(--color-muted)]">{t.desc}</span>
               </button>
             ))}
           </div>
