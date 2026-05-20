@@ -1,6 +1,8 @@
 # Environment
 .env
 .env.local
+.env.production
+.env.development
 
 # Python
 __pycache__/
@@ -8,6 +10,8 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+venv/
+.venv/
 backend/.venv/
 *.egg-info/
 dist/
@@ -18,6 +22,12 @@ build/
 node_modules/
 frontend/dist/
 frontend/.vite/
+.vercel/
+
+# Generated
+*.pdf
+/backend/debug_links.py
+/backend/debug_pdf_export.py
 
 # Editor
 .vscode/

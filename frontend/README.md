@@ -1,16 +1,24 @@
-# React + Vite
+# Loophire — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React frontend for the Loophire AI job application agent.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+React 18 · Vite · Tailwind CSS · React Query ·
+Recharts · @hello-pangea/dnd · WebSockets
 
-## React Compiler
+## Quick start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+echo "VITE_API_URL=http://localhost:8000" > .env.local
+npm run dev
+```
 
-## Expanding the ESLint configuration
+## Key components
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `KanbanBoard.jsx` — Drag-and-drop application tracker
+- `CVViewer.jsx` — Split-panel CV reader with keyboard nav
+- `GenerationProgress.jsx` — Real-time WebSocket progress UI
+- `hooks/useGenerationProgress.js` — WebSocket client hook
+- `hooks/useApplications.js` — React Query data layer
