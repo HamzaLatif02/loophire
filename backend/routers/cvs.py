@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies.auth_dependency import get_current_user
+from dependencies.demo_guard import require_non_demo
 from models.cv_version import CVVersion
 from models.user import User
 from services.cv_parser import parse_pdf_with_links
@@ -101,7 +102,7 @@ async def upload_cv_version(
     file: UploadFile = File(...),
     name: str = Form(...),
     template_id: str = Form(default="auto"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_non_demo),
     db: Session = Depends(get_db),
 ):
     if file.content_type not in ("application/pdf", "application/octet-stream"):
@@ -163,7 +164,7 @@ async def upload_cv_version(
 def set_default_cv(
     request: Request,
     cv_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_non_demo),
     db: Session = Depends(get_db),
 ):
     cv = db.query(CVVersion).filter(CVVersion.id == cv_id, CVVersion.user_id == current_user.id).first()
@@ -331,7 +332,7 @@ async def download_cv_pdf(
 def delete_cv_version(
     request: Request,
     cv_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_non_demo),
     db: Session = Depends(get_db),
 ):
     cv = db.query(CVVersion).filter(CVVersion.id == cv_id, CVVersion.user_id == current_user.id).first()

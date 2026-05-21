@@ -18,6 +18,29 @@ const inputCls =
 const SOURCES = ['reed', 'adzuna', 'both']
 
 export default function ApplyPage() {
+  const isDemo = localStorage.getItem('loophire_is_demo') === 'true'
+  if (isDemo) return <DemoApplyBlock />
+  return <ApplyPageInner />
+}
+
+function DemoApplyBlock() {
+  return (
+    <div className="max-w-xl mx-auto py-16 text-center space-y-4 px-4">
+      <p className="text-2xl font-bold text-[var(--color-text)]">Generation disabled in demo mode</p>
+      <p className="text-sm text-[var(--color-muted)]">
+        Create a free account to generate tailored CVs, cover letters, and fit scores for real jobs.
+      </p>
+      <a
+        href="/register"
+        className="inline-block px-6 py-2.5 bg-[var(--color-accent)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--color-accent-2)] transition-colors"
+      >
+        Create free account
+      </a>
+    </div>
+  )
+}
+
+function ApplyPageInner() {
   const jdRef    = useRef(null)
   const formRef  = useRef(null)
   const liInterval = useRef(null)

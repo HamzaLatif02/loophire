@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies.auth_dependency import get_current_user
+from dependencies.demo_guard import require_non_demo
 from models.user import User
 from schemas.cv import CVResponse, CVUploadResponse
 from services.cv_parser import parse_pdf_with_links
@@ -22,7 +23,7 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 async def upload_cv(
     request: Request,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_non_demo),
     db: Session = Depends(get_db),
 ):
     logger.info("Upload endpoint hit for user_id=%d", current_user.id)

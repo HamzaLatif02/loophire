@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import os
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -96,8 +98,11 @@ app.include_router(ws_router.router)
 
 # ── startup ───────────────────────────────────────────────────────────────────
 
+_scheduler = AsyncIOScheduler()
+
+
 @app.on_event("startup")
-def startup_check() -> None:
+async def startup_check() -> None:
     _log = logging.getLogger("loophire.main")
 
     required = ["DATABASE_URL", "ANTHROPIC_API_KEY", "TAVILY_API_KEY", "SECRET_KEY"]
@@ -112,6 +117,28 @@ def startup_check() -> None:
             _log.error("env %s: MISSING — this will cause failures", var)
     for var in optional:
         _log.info("env %s: %s", var, "SET" if os.getenv(var) else "not set")
+
+    # Seed demo account on startup, then reset every 24 hours
+    try:
+        from scripts.seed_demo import seed_demo
+        await asyncio.to_thread(seed_demo)
+    except Exception:
+        _log.warning("Demo seed on startup failed — demo login will be unavailable", exc_info=True)
+
+    def _reset_demo() -> None:
+        try:
+            from scripts.seed_demo import seed_demo as _seed
+            _seed()
+        except Exception:
+            logging.getLogger("loophire.demo").exception("Scheduled demo reset failed")
+
+    _scheduler.add_job(_reset_demo, "interval", hours=24, id="demo_reset", replace_existing=True)
+    _scheduler.start()
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    _scheduler.shutdown(wait=False)
 
 
 # ── exception handlers ────────────────────────────────────────────────────────

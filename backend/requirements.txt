@@ -22,3 +22,4 @@ limits
 websockets
 pydantic[email]
 email-validator
+APScheduler>=3.10.0

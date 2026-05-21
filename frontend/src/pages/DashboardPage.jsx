@@ -45,6 +45,7 @@ function fitColor(score) {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const isDemo = localStorage.getItem('loophire_is_demo') === 'true'
 
   const {
     data: apps = [],
@@ -136,19 +137,21 @@ export default function DashboardPage() {
   if (!appsLoading && !appsError && apps.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} />
+        <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} isDemo={isDemo} />
         <div className="rounded-xl border border-dashed border-[var(--color-border)] py-24 text-center space-y-4">
           <p className="text-4xl">📭</p>
           <p className="font-semibold text-[var(--color-text)]">No applications yet</p>
           <p className="text-sm text-[var(--color-muted)] max-w-xs mx-auto">
             Generate your first application to get started
           </p>
-          <button
-            onClick={() => navigate('/apply')}
-            className="mt-2 px-5 py-2.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
-          >
-            Start a New Application
-          </button>
+          {!isDemo && (
+            <button
+              onClick={() => navigate('/apply')}
+              className="mt-2 px-5 py-2.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
+            >
+              Start a New Application
+            </button>
+          )}
         </div>
       </div>
     )
@@ -159,7 +162,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
 
-      <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} />
+      <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} isDemo={isDemo} />
 
       {appsError && (
         <ErrorBanner message={appsError.response?.data?.error ?? appsError.response?.data?.detail ?? 'Failed to load applications.'} />
@@ -337,10 +340,12 @@ export default function DashboardPage() {
                           >
                             View →
                           </button>
-                          <DeleteButton
-                            applicationId={app.id}
-                            className="px-3 py-2 rounded-lg border text-xs font-medium"
-                          />
+                          {!isDemo && (
+                            <DeleteButton
+                              applicationId={app.id}
+                              className="px-3 py-2 rounded-lg border text-xs font-medium"
+                            />
+                          )}
                         </div>
                       </div>
                     ))}
@@ -409,10 +414,12 @@ export default function DashboardPage() {
                                 >
                                   View →
                                 </button>
-                                <DeleteButton
-                                  applicationId={app.id}
-                                  className="px-2.5 py-1 rounded-md border text-xs font-medium"
-                                />
+                                {!isDemo && (
+                                  <DeleteButton
+                                    applicationId={app.id}
+                                    className="px-2.5 py-1 rounded-md border text-xs font-medium"
+                                  />
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -431,7 +438,7 @@ export default function DashboardPage() {
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
-function PageHeader({ navigate, dataUpdatedAt, view, onSwitchView }) {
+function PageHeader({ navigate, dataUpdatedAt, view, onSwitchView, isDemo = false }) {
   return (
     <div className="flex items-start sm:items-center justify-between gap-3">
       <div>
@@ -468,12 +475,14 @@ function PageHeader({ navigate, dataUpdatedAt, view, onSwitchView }) {
             ⊞ Board
           </button>
         </div>
-        <button
-          onClick={() => navigate('/apply')}
-          className="shrink-0 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
-        >
-          + New
-        </button>
+        {!isDemo && (
+          <button
+            onClick={() => navigate('/apply')}
+            className="shrink-0 px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
+          >
+            + New
+          </button>
+        )}
       </div>
     </div>
   )

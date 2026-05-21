@@ -35,6 +35,7 @@ export default function Navbar() {
 
   function handleLogout() {
     removeToken()
+    localStorage.removeItem('loophire_is_demo')
     setMenuOpen(false)
     navigate('/login')
   }

@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, field_validator
@@ -10,6 +11,8 @@ from models.user import User
 from utils.auth import create_access_token, hash_password, verify_password
 from utils.rate_limiter import LIMITS, limiter
 from utils.sanitiser import _COMMON_PASSWORDS, sanitise_email
+
+DEMO_EMAIL = "demo@loophire.xyz"
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +125,31 @@ def me(current_user: User = Depends(get_current_user)):
 @router.post("/logout")
 def logout(current_user: User = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
+
+
+@router.post("/demo")
+@limiter.limit("20/minute")
+def demo_login(request: Request, db: Session = Depends(get_db)):
+    """Log in as the demo user instantly. Returns a 2-hour JWT flagged as demo."""
+    user = db.query(User).filter(
+        User.email == DEMO_EMAIL, User.is_demo == True  # noqa: E712
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=503,
+            detail="Demo account is being prepared. Please try again in a moment.",
+        )
+
+    token = create_access_token(
+        user.id,
+        expires_delta=timedelta(hours=2),
+        extra_claims={"is_demo": True},
+    )
+    logger.info("Demo login issued for user_id=%d", user.id)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "is_demo": True,
+        "user": {"id": user.id, "email": user.email, "is_demo": True},
+    }

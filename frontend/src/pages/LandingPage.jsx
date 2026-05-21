@@ -1,4 +1,7 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import api from '../utils/api'
+import { setToken } from '../utils/auth'
 
 // ── Icon components ────────────────────────────────────────────────────────────
 
@@ -124,6 +127,23 @@ function LandingNav() {
 // ── 2. Hero ────────────────────────────────────────────────────────────────────
 
 function HeroSection() {
+  const [demoLoading, setDemoLoading] = useState(false)
+  const navigate = useNavigate()
+
+  const handleTryDemo = async () => {
+    setDemoLoading(true)
+    try {
+      const { data } = await api.post('/auth/demo')
+      setToken(data.access_token)
+      localStorage.setItem('loophire_is_demo', 'true')
+      navigate('/applications')
+    } catch {
+      alert('Demo is loading — please try again in a moment.')
+    } finally {
+      setDemoLoading(false)
+    }
+  }
+
   return (
     <section id="hero" className="pt-24 pb-20 px-4 sm:px-6 lg:px-8 text-center">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -145,16 +165,28 @@ function HeroSection() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-          <CtaLink to="/register" variant="primary">
-            Get started free
-            <Icon d={ICONS.arrow} size={16} strokeWidth={2} />
-          </CtaLink>
-          <CtaLink to="/login" variant="secondary">
-            Already have an account
+          <button
+            onClick={handleTryDemo}
+            disabled={demoLoading}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-sm bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white disabled:opacity-70 transition-colors"
+          >
+            {demoLoading ? (
+              <>
+                <span className="animate-spin inline-block">⟳</span>
+                Loading demo…
+              </>
+            ) : (
+              <>⚡ Try demo — no signup needed</>
+            )}
+          </button>
+          <CtaLink to="/register" variant="secondary">
+            Create free account
           </CtaLink>
         </div>
 
-        <p className="text-xs text-[var(--color-muted)]">No credit card required · 100% free</p>
+        <p className="text-xs text-[var(--color-muted)]">
+          Demo is read-only · Resets every 24 hours · No credit card required
+        </p>
       </div>
     </section>
   )

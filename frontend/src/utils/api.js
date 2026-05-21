@@ -36,6 +36,12 @@ api.interceptors.response.use(
         error.userMessage = data?.detail || 'Please check your inputs and try again.'
       }
     }
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.detail?.includes('demo mode')
+    ) {
+      error.userMessage = error.response.data.detail
+    }
     return Promise.reject(error)
   },
 )

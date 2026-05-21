@@ -16,6 +16,7 @@ from agents.tone_agent import analyse_tone
 from agents.writer_agent import write_application
 from database import SessionLocal, get_db
 from dependencies.auth_dependency import get_current_user
+from dependencies.demo_guard import require_non_demo
 from services.job_scraper_service import scrape_job
 from services.latex_export_service import (
     generate_cv_pdf,
@@ -335,7 +336,7 @@ async def generate_application(
     request: Request,
     body: ApplicationGenerateRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_non_demo),
     db: Session = Depends(get_db),
 ):
     # Resolve CV synchronously so we can fail fast on missing CV
@@ -395,7 +396,7 @@ async def regenerate_application(
     request: Request,
     application_id: int,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_non_demo),
     db: Session = Depends(get_db),
 ):
     application = _get_application(application_id, current_user.id, db)
@@ -535,7 +536,7 @@ def get_analytics(
 def delete_application(
     request: Request,
     application_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_non_demo),
     db: Session = Depends(get_db),
 ):
     application = _get_application(application_id, current_user.id, db)

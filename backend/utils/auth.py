@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import bcrypt
 from jose import JWTError, jwt
@@ -21,13 +22,18 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain_bytes, hashed_bytes)
 
 
-def create_access_token(user_id: int) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    return jwt.encode(
-        {"sub": str(user_id), "exp": expire},
-        SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
+def create_access_token(
+    user_id: int,
+    expires_delta: Optional[timedelta] = None,
+    extra_claims: Optional[dict] = None,
+) -> str:
+    if expires_delta is None:
+        expires_delta = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + expires_delta
+    payload = {"sub": str(user_id), "exp": expire}
+    if extra_claims:
+        payload.update(extra_claims)
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decode_token(token: str) -> int:
