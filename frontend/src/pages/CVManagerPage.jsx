@@ -3,12 +3,15 @@ import { useCVVersions } from '../hooks/useApplications'
 import CVUploadForm from '../components/CVUploadForm'
 import CVCard from '../components/CVCard'
 import CVViewer from '../components/CVViewer'
+import DemoBlockedMessage from '../components/DemoBlockedMessage'
+import useDemoGuard from '../hooks/useDemoGuard'
 
 export default function CVManagerPage() {
   const { data: versions = [], isLoading } = useCVVersions()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [viewerOpen, setViewerOpen]       = useState(false)
   const [uploadOpen, setUploadOpen]       = useState(false)
+  const { guard: guardAdd, visible: addBlocked } = useDemoGuard()
 
   const selectedCV = versions[selectedIndex] || null
 
@@ -46,12 +49,15 @@ export default function CVManagerPage() {
             {versions.length} CV version{versions.length !== 1 ? 's' : ''} stored
           </p>
         </div>
-        <button
-          onClick={() => setUploadOpen(o => !o)}
-          className="px-4 py-2 bg-[var(--color-accent)] text-white text-sm font-medium rounded-lg hover:bg-[var(--color-accent-2)] transition-colors"
-        >
-          + Add CV
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={() => guardAdd(() => setUploadOpen(o => !o))}
+            className="px-4 py-2 bg-[var(--color-accent)] text-white text-sm font-medium rounded-lg hover:bg-[var(--color-accent-2)] transition-colors"
+          >
+            + Add CV
+          </button>
+          <DemoBlockedMessage visible={addBlocked} />
+        </div>
       </div>
 
       {/* Upload form — collapsible */}

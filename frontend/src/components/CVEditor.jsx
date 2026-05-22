@@ -401,6 +401,7 @@ function EditForm({ draft, setDraft, setModified }) {
 // ─── main export ──────────────────────────────────────────────────────────────
 
 export default function CVEditor({ value, onSave, exportUrl, exportFilename }) {
+  const isDemo = localStorage.getItem('loophire_is_demo') === 'true'
   const [editing, setEditing]     = useState(false)
   const [draft, setDraft]         = useState(null)
   const [modified, setModified]   = useState(false)
@@ -485,7 +486,7 @@ export default function CVEditor({ value, onSave, exportUrl, exportFilename }) {
           {!editing ? (
             <>
               <CopyButton text={cvToPlainText(value)} />
-              {exportUrl && (
+              {exportUrl && !isDemo && (
                 <button
                   onClick={handleExport}
                   disabled={exporting}

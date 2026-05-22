@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import usePdfAction from '../hooks/usePdfAction'
+import useDemoGuard from '../hooks/useDemoGuard'
 
 export default function CVViewer({ cv, onClose, onPrev, onNext, currentIndex, total }) {
   const scrollRef = useRef(null)
   const [copied, setCopied] = useState(false)
   const { loading: previewing, openInNewTab: previewPdf } = usePdfAction()
   const { loading: downloading, download: downloadPdf }   = usePdfAction()
+  const { isDemo } = useDemoGuard()
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0
@@ -83,22 +85,26 @@ export default function CVViewer({ cv, onClose, onPrev, onNext, currentIndex, to
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={handlePreviewPdf}
-            disabled={previewing}
-            title="Open PDF in new tab"
-            className="px-2.5 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
-          >
-            {previewing ? 'Opening…' : 'Preview PDF'}
-          </button>
-          <button
-            onClick={handleDownloadPdf}
-            disabled={downloading}
-            title="Download PDF"
-            className="px-2.5 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
-          >
-            {downloading ? 'Downloading…' : 'Download PDF'}
-          </button>
+          {!isDemo && (
+            <button
+              onClick={handlePreviewPdf}
+              disabled={previewing}
+              title="Open PDF in new tab"
+              className="px-2.5 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
+            >
+              {previewing ? 'Opening…' : 'Preview PDF'}
+            </button>
+          )}
+          {!isDemo && (
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              title="Download PDF"
+              className="px-2.5 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
+            >
+              {downloading ? 'Downloading…' : 'Download PDF'}
+            </button>
+          )}
           <button
             onClick={handleCopy}
             title="Copy CV text"

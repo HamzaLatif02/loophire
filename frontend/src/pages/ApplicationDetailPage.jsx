@@ -9,8 +9,10 @@ import NotesEditor from '../components/NotesEditor'
 import { ApplicationDetailSkeleton } from '../components/skeletons/ApplicationDetailSkeleton'
 import Spinner from '../components/Spinner'
 import DeleteButton from '../components/DeleteButton'
+import DemoBlockedMessage from '../components/DemoBlockedMessage'
 import { KEYS, useApplication, useUpdateApplication, useUpdateStatus } from '../hooks/useApplications'
 import { useGenerationProgress } from '../hooks/useGenerationProgress'
+import useDemoGuard from '../hooks/useDemoGuard'
 import api from '../utils/api'
 
 
@@ -100,6 +102,8 @@ export default function ApplicationDetailPage() {
   const [showRegenModal, setShowRegenModal]     = useState(false)
   const [isRegenerating, setIsRegenerating]     = useState(false)
   const dropdownRef = useRef(null)
+  const { isDemo, guard: guardRegen, visible: regenBlocked } = useDemoGuard()
+  const { guard: guardPrep, visible: prepBlocked } = useDemoGuard()
 
   const {
     progress: regenProgress,
@@ -341,23 +345,26 @@ export default function ApplicationDetailPage() {
           </div>
 
           {/* action buttons */}
-          <div className="flex gap-2 w-full md:w-auto">
-            <button
-              onClick={() => setShowRegenModal(true)}
-              disabled={isRegenerating}
-              title="Re-run the full generation pipeline"
-              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-              </svg>
-              Regenerate
-            </button>
-            <DeleteButton
-              applicationId={Number(id)}
-              onDeleted={() => navigate('/applications')}
-              className="flex-1 md:flex-none px-3 py-2 md:py-1.5 rounded-lg border text-xs font-medium"
-            />
+          <div className="flex flex-col gap-1 w-full md:w-auto">
+            <div className="flex gap-2">
+              <button
+                onClick={() => guardRegen(() => setShowRegenModal(true))}
+                disabled={isRegenerating}
+                title="Re-run the full generation pipeline"
+                className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-lg border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Regenerate
+              </button>
+              <DeleteButton
+                applicationId={Number(id)}
+                onDeleted={() => navigate('/applications')}
+                className="flex-1 md:flex-none px-3 py-2 md:py-1.5 rounded-lg border text-xs font-medium"
+              />
+            </div>
+            <DemoBlockedMessage visible={regenBlocked} />
           </div>
 
           {/* status dropdown */}
@@ -542,12 +549,14 @@ export default function ApplicationDetailPage() {
                     This application was generated without CV tailoring. Regenerate with "Rewrite CV" enabled to get a tailored version.
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowRegenModal(true)}
-                  className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-semibold transition-colors"
-                >
-                  Regenerate with CV rewrite
-                </button>
+                {!isDemo && (
+                  <button
+                    onClick={() => setShowRegenModal(true)}
+                    className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-semibold transition-colors"
+                  >
+                    Regenerate with CV rewrite
+                  </button>
+                )}
               </div>
             )
         )}
@@ -574,12 +583,14 @@ export default function ApplicationDetailPage() {
                     This application was generated without a cover letter. Regenerate to add one.
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowRegenModal(true)}
-                  className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-semibold transition-colors"
-                >
-                  Regenerate with cover letter
-                </button>
+                {!isDemo && (
+                  <button
+                    onClick={() => setShowRegenModal(true)}
+                    className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-semibold transition-colors"
+                  >
+                    Regenerate with cover letter
+                  </button>
+                )}
               </div>
             )
         )}
@@ -587,12 +598,15 @@ export default function ApplicationDetailPage() {
           <AnalysisPanel app={app} score={score} color={color} fitLabel={fitLabel} />
         )}
         {activeTab === 3 && (
-          <InterviewPrepPanel
-            app={app}
-            onGenerate={generateInterviewPrep}
-            generating={generatingPrep}
-            error={prepError}
-          />
+          <>
+            <InterviewPrepPanel
+              app={app}
+              onGenerate={() => guardPrep(generateInterviewPrep)}
+              generating={generatingPrep}
+              error={prepError}
+            />
+            <DemoBlockedMessage visible={prepBlocked} />
+          </>
         )}
         {activeTab === 4 && (
           <div className="py-4">

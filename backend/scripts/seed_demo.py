@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 DEMO_EMAIL    = "demo@loophire.xyz"
 DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "loophire-demo-2025")
 
-DEMO_CV_TEXT = """Hamza Latif
-lhamza1020@gmail.com | LinkedIn | Github | Website
+DEMO_CV_TEXT = """Alex Morgan
+alex.morgan@demo.loophire.xyz | LinkedIn | Github | Website
 
 Profile
 First Class Computer Science graduate with an MSc Distinction in Data Science. Technical
@@ -30,22 +30,23 @@ Technologies: APIs, FastAPI, React, PostgreSQL
 AI/ML: scikit-learn, TensorFlow, LLM APIs
 
 Education
-King's College London, MSc Data Science 2024-2025
+Metropolitan University, MSc Data Science 2024-2025
 Grade: Distinction
 
-City, University of London, BSc Computer Science 2021-2024
+City Tech University, BSc Computer Science 2021-2024
 Grade: First Class
 
 Experience
-Data Analyst, Premier Services Associate Ltd Jun 2025
+Data Analyst, Axiom Analytics Ltd Jun 2025
 - Integrated 4+ third-party APIs handling 1,000+ requests
 - Designed modular data pipelines processing 10k+ data points
 - Reduced manual analysis effort by 50% through automation
 
 Projects
-Roleprint — NLP job market analytics platform
-Finpipe — Financial analysis web application
-Loophire — AI-powered job application agent
+Marketscope — NLP job market analytics platform
+Cashflow — Financial analysis web application
+LexBench — Legal NLP benchmarking toolkit
+VisionGuard — Computer vision monitoring system
 """
 
 DEMO_CV_JSON = {
@@ -62,7 +63,7 @@ DEMO_CV_JSON = {
     ],
     "education": [
         {
-            "institution": "King's College London",
+            "institution": "Metropolitan University",
             "degree": "MSc Data Science",
             "dates": "2024 – 2025",
             "highlights": [
@@ -71,7 +72,7 @@ DEMO_CV_JSON = {
             ],
         },
         {
-            "institution": "City, University of London",
+            "institution": "City Tech University",
             "degree": "BSc Computer Science",
             "dates": "2021 – 2024",
             "highlights": [
@@ -83,7 +84,7 @@ DEMO_CV_JSON = {
     "experience": [
         {
             "title": "Data Analyst",
-            "company": "Premier Services Associate Ltd",
+            "company": "Axiom Analytics Ltd",
             "dates": "Jun 2025",
             "highlights": [
                 "Integrated 4+ third-party APIs (OpenAI, Claude, Gemini), handling 1,000+ requests during testing.",
@@ -94,17 +95,24 @@ DEMO_CV_JSON = {
     ],
     "projects": [
         {
-            "name": "Roleprint",
-            "github_url": "https://github.com/HamzaLatif02/roleprint",
+            "name": "Marketscope",
+            "github_url": "",
             "highlights": [
-                "Built a live NLP job market analytics platform (roleprint.xyz) processing 10,000+ job postings across 10 tech roles."
+                "Built a live NLP job market analytics platform processing 10,000+ job postings across 10 tech roles."
             ],
         },
         {
-            "name": "Finpipe",
-            "github_url": "https://github.com/HamzaLatif02/finpipe",
+            "name": "Cashflow",
+            "github_url": "",
             "highlights": [
-                "Developed a live financial analysis web app (finpipe.xyz) reducing asset analysis to under 30 seconds."
+                "Developed a live financial analysis web app reducing asset analysis to under 30 seconds."
+            ],
+        },
+        {
+            "name": "LexBench",
+            "github_url": "",
+            "highlights": [
+                "Created a legal NLP benchmarking toolkit evaluating 5 language models on contract analysis tasks."
             ],
         },
     ],
@@ -135,15 +143,15 @@ DEMO_APPLICATIONS = [
             "Dear Hiring Team,\n\n"
             "I am writing to express my strong interest in the Software Engineer position "
             "at Anthropic. As a First Class Computer Science graduate with an MSc Distinction "
-            "in Data Science from King's College London, I bring a deep foundation in building "
+            "in Data Science from Metropolitan University, I bring a deep foundation in building "
             "reliable, scalable systems — directly aligned with Anthropic's mission.\n\n"
-            "In my recent work at Premier Services Associate Ltd, I integrated 4+ LLM APIs "
+            "In my recent work at Axiom Analytics Ltd, I integrated 4+ LLM APIs "
             "and designed modular data pipelines processing 10k+ data points, reducing "
-            "iteration time by 40%. My projects — including Roleprint, a live NLP platform "
-            "processing 10,000+ job postings, and Loophire, an autonomous AI job application "
-            "agent — demonstrate my ability to ship production systems end-to-end.\n\n"
+            "iteration time by 40%. My projects — including Marketscope, a live NLP platform "
+            "processing 10,000+ job postings, and LexBench, a legal NLP benchmarking toolkit "
+            "— demonstrate my ability to ship production systems end-to-end.\n\n"
             "I would welcome the opportunity to contribute to Anthropic's work on safe and "
-            "beneficial AI.\n\nYours sincerely,\nHamza Latif"
+            "beneficial AI.\n\nYours sincerely,\nAlex Morgan"
         ),
         "tone_analysis": {
             "tone": "technical",
@@ -178,14 +186,14 @@ DEMO_APPLICATIONS = [
             ],
             "cv_based": [
                 {
-                    "question": "Walk me through the architecture of Loophire.",
-                    "framework": "FastAPI + background tasks + WebSockets + 6 agents.",
+                    "question": "Walk me through the architecture of Marketscope.",
+                    "framework": "FastAPI + background tasks + real-time data pipelines + NLP processing.",
                 }
             ],
         },
         "interview_date": _NOW + timedelta(days=3),
         "interview_notes": "Technical round with the platform team. Prepare system design.",
-        "notes": "Recruiter: Sarah Chen\nsarah.chen@anthropic.com\nSalary range: £90k-£120k\nHybrid — London office",
+        "notes": "Recruiter: James Taylor\njames.t@hiring.co.uk\nSalary range: £90k-£120k\nHybrid — London office",
         "created_at": _NOW - timedelta(days=5),
         "last_generated_at": _NOW - timedelta(days=5),
     },

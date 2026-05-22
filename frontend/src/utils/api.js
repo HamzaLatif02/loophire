@@ -18,7 +18,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       removeToken()
-      window.location.href = '/login'
+      localStorage.removeItem('loophire_is_demo')
+      window.location.href = '/'
     }
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers['retry-after']

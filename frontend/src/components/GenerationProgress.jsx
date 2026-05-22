@@ -26,17 +26,21 @@ export default function GenerationProgress({
     { key: 'saving',  label: 'Saving' },
   ]
 
+  const isDemo = localStorage.getItem('loophire_is_demo') === 'true'
+
   if (error) {
     return (
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-10 flex flex-col items-center gap-5 text-center">
         <span className="text-4xl">❌</span>
         <p className="text-sm text-[var(--color-danger)]">{error}</p>
-        <button
-          onClick={onReset}
-          className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-medium transition-colors"
-        >
-          Try again
-        </button>
+        {!isDemo && (
+          <button
+            onClick={onReset}
+            className="px-4 py-2 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white text-sm font-medium transition-colors"
+          >
+            Try again
+          </button>
+        )}
       </div>
     )
   }

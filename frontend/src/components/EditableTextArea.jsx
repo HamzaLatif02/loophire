@@ -3,6 +3,7 @@ import CopyButton from './CopyButton'
 import Spinner from './Spinner'
 
 export default function EditableTextArea({ value, onSave, exportUrl, exportFilename, emptyMsg }) {
+  const isDemo = localStorage.getItem('loophire_is_demo') === 'true'
   const [editing, setEditing]     = useState(false)
   const [draft, setDraft]         = useState('')
   const [modified, setModified]   = useState(false)
@@ -88,7 +89,7 @@ export default function EditableTextArea({ value, onSave, exportUrl, exportFilen
           {!editing ? (
             <>
               <CopyButton text={value} />
-              {exportUrl && (
+              {exportUrl && !isDemo && (
                 <button
                   onClick={handleExport}
                   disabled={exporting}

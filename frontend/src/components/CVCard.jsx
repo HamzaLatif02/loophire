@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import api from '../utils/api'
 import { KEYS } from '../hooks/useApplications'
 import usePdfAction from '../hooks/usePdfAction'
+import useDemoGuard from '../hooks/useDemoGuard'
+import DemoBlockedMessage from './DemoBlockedMessage'
 
 const TEMPLATE_OPTIONS = [
   { id: 'auto',       name: 'Auto',       desc: 'Auto-detect best match' },
@@ -24,6 +26,7 @@ export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
 
   const { loading: previewing, openInNewTab: previewPdf } = usePdfAction()
   const { loading: downloading, download: downloadPdf }   = usePdfAction()
+  const { isDemo, guard: guardCard, visible: cardBlocked } = useDemoGuard()
 
   useEffect(() => {
     if (!showDropdown) return
@@ -47,32 +50,32 @@ export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
     }
   }
 
-  const handleSetDefault = async (e) => {
+  const handleSetDefault = (e) => {
     e.stopPropagation()
-    setSettingDefault(true)
-    try {
-      await api.patch(`/cvs/${cv.id}/set-default`)
-      queryClient.invalidateQueries({ queryKey: KEYS.cvVersions })
-    } finally {
-      setSettingDefault(false)
-    }
+    guardCard(async () => {
+      setSettingDefault(true)
+      try {
+        await api.patch(`/cvs/${cv.id}/set-default`)
+        queryClient.invalidateQueries({ queryKey: KEYS.cvVersions })
+      } finally {
+        setSettingDefault(false)
+      }
+    })
   }
 
-  const handleDelete = async (e) => {
+  const handleDelete = (e) => {
     e.stopPropagation()
-    if (!confirmDel) {
-      setConfirmDel(true)
-      setTimeout(() => setConfirmDel(false), 3000)
-      return
-    }
-    setDeleting(true)
-    try {
-      await api.delete(`/cvs/${cv.id}`)
-      queryClient.invalidateQueries({ queryKey: KEYS.cvVersions })
-    } finally {
-      setDeleting(false)
-      setConfirmDel(false)
-    }
+    guardCard(() => {
+      if (!confirmDel) {
+        setConfirmDel(true)
+        setTimeout(() => setConfirmDel(false), 3000)
+        return
+      }
+      setDeleting(true)
+      api.delete(`/cvs/${cv.id}`)
+        .then(() => queryClient.invalidateQueries({ queryKey: KEYS.cvVersions }))
+        .finally(() => { setDeleting(false); setConfirmDel(false) })
+    })
   }
 
   const handlePreviewPdf = (e) => {
@@ -143,21 +146,25 @@ export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
           {isSelected ? '👁 Viewing' : '👁 View'}
         </button>
 
-        <button
-          onClick={handlePreviewPdf}
-          disabled={previewing}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors disabled:opacity-50"
-        >
-          {previewing ? 'Opening…' : 'Preview PDF'}
-        </button>
+        {!isDemo && (
+          <button
+            onClick={handlePreviewPdf}
+            disabled={previewing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors disabled:opacity-50"
+          >
+            {previewing ? 'Opening…' : 'Preview PDF'}
+          </button>
+        )}
 
-        <button
-          onClick={handleDownloadPdf}
-          disabled={downloading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors disabled:opacity-50"
-        >
-          {downloading ? 'Downloading…' : 'Download PDF'}
-        </button>
+        {!isDemo && (
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors disabled:opacity-50"
+          >
+            {downloading ? 'Downloading…' : 'Download PDF'}
+          </button>
+        )}
 
         {!cv.is_default && (
           <button
@@ -182,42 +189,46 @@ export default function CVCard({ cv, isSelected, compact, onView, onSelect }) {
         </button>
       </div>
 
-      {/* Template dropdown */}
-      <div
-        ref={dropdownRef}
-        className="mt-2 pt-2 border-t border-[var(--color-border)] relative"
-        onClick={e => e.stopPropagation()}
-      >
-        <button
-          onClick={() => setShowDropdown(v => !v)}
-          disabled={updating}
-          className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
-        >
-          <span>Template:</span>
-          <span className="text-[var(--color-text)]">{currentTemplate.name}</span>
-          <span className="text-[var(--color-muted)] ml-0.5">{showDropdown ? '▲' : '▼'}</span>
-        </button>
+      <DemoBlockedMessage visible={cardBlocked} />
 
-        {showDropdown && (
-          <div className="absolute left-0 top-full mt-1 z-20 w-52 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg overflow-hidden">
-            {TEMPLATE_OPTIONS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => handleTemplateChange(t.id)}
-                disabled={updating}
-                className={`w-full text-left px-3 py-2.5 flex flex-col gap-0.5 transition-colors ${
-                  cv.template_id === t.id || (t.id === 'classic' && !cv.template_id)
-                    ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
-                    : 'text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
-                }`}
-              >
-                <span className="text-xs font-medium">{t.name}</span>
-                <span className="text-xs text-[var(--color-muted)]">{t.desc}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Template dropdown — hidden in demo */}
+      {!isDemo && (
+        <div
+          ref={dropdownRef}
+          className="mt-2 pt-2 border-t border-[var(--color-border)] relative"
+          onClick={e => e.stopPropagation()}
+        >
+          <button
+            onClick={() => setShowDropdown(v => !v)}
+            disabled={updating}
+            className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] flex items-center gap-1.5 transition-colors disabled:opacity-50"
+          >
+            <span>Template:</span>
+            <span className="text-[var(--color-text)]">{currentTemplate.name}</span>
+            <span className="text-[var(--color-muted)] ml-0.5">{showDropdown ? '▲' : '▼'}</span>
+          </button>
+
+          {showDropdown && (
+            <div className="absolute left-0 top-full mt-1 z-20 w-52 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg overflow-hidden">
+              {TEMPLATE_OPTIONS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => handleTemplateChange(t.id)}
+                  disabled={updating}
+                  className={`w-full text-left px-3 py-2.5 flex flex-col gap-0.5 transition-colors ${
+                    cv.template_id === t.id || (t.id === 'classic' && !cv.template_id)
+                      ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
+                      : 'text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
+                  }`}
+                >
+                  <span className="text-xs font-medium">{t.name}</span>
+                  <span className="text-xs text-[var(--color-muted)]">{t.desc}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
