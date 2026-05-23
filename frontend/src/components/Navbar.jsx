@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { isLoggedIn, removeToken } from '../utils/auth'
+import { useCVVersions } from '../hooks/useApplications'
 import api from '../utils/api'
 
 const links = [
@@ -12,9 +13,13 @@ const links = [
 export default function Navbar() {
   const navigate      = useNavigate()
   const loggedIn      = isLoggedIn()
+  const isDemo        = localStorage.getItem('loophire_is_demo') === 'true'
   const [email, setEmail]       = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const headerRef = useRef(null)
+
+  const { data: cvVersions = [] } = useCVVersions({ enabled: loggedIn })
+  const needsCV = loggedIn && !isDemo && cvVersions.length === 0
 
   useEffect(() => {
     if (!loggedIn) return
@@ -68,7 +73,7 @@ export default function Navbar() {
                     key={to}
                     to={to}
                     className={({ isActive }) =>
-                      `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      `relative px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-[var(--color-surface-2)] text-[var(--color-accent)]'
                           : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
@@ -76,6 +81,9 @@ export default function Navbar() {
                     }
                   >
                     {label}
+                    {to === '/cv-manager' && needsCV && (
+                      <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+                    )}
                   </NavLink>
                 ))}
               </nav>
@@ -121,7 +129,7 @@ export default function Navbar() {
                     to={to}
                     onClick={closeMenu}
                     className={({ isActive }) =>
-                      `flex items-center px-6 py-4 text-sm font-medium border-b border-[var(--color-border)] transition-colors ${
+                      `flex items-center gap-2 px-6 py-4 text-sm font-medium border-b border-[var(--color-border)] transition-colors ${
                         isActive
                           ? 'text-[var(--color-accent)] bg-[var(--color-surface-2)]'
                           : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
@@ -129,6 +137,9 @@ export default function Navbar() {
                     }
                   >
                     {label}
+                    {to === '/cv-manager' && needsCV && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+                    )}
                   </NavLink>
                 ))}
                 <div className="px-6 py-4">

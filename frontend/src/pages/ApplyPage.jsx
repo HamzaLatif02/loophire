@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import ErrorBanner from '../components/ErrorBanner'
 import GenerationProgress from '../components/GenerationProgress'
 import Spinner from '../components/Spinner'
-import { useInvalidateApplications } from '../hooks/useApplications'
+import { useInvalidateApplications, useCVVersions } from '../hooks/useApplications'
 import { useGenerationProgress } from '../hooks/useGenerationProgress'
 import api from '../utils/api'
 
@@ -49,6 +49,9 @@ function ApplyPageInner() {
   const jobId        = searchParams.get('job_id')
   const fromExt      = searchParams.get('from_extension') === 'true'
 
+  const { data: cvVersionsData = [], isLoading: cvsLoading } = useCVVersions()
+  const hasCV = cvVersionsData.length > 0
+
   const { progress, isComplete, wsError, applicationId, connect, reset } = useGenerationProgress()
   const [isGenerating, setIsGenerating] = useState(false)
   const invalidateApplications = useInvalidateApplications()
@@ -77,18 +80,15 @@ function ApplyPageInner() {
   }, [jobId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── CV versions ─────────────────────────────────────────────────────────────
-  const [cvVersions, setCvVersions]       = useState([])
   const [selectedCvId, setSelectedCvId]   = useState(null) // null = use default
 
   useEffect(() => {
-    api.get('/cvs')
-      .then(res => {
-        setCvVersions(res.data)
-        const def = res.data.find(v => v.is_default)
-        if (def) setSelectedCvId(def.id)
-      })
-      .catch(() => {})
-  }, [])
+    if (cvVersionsData.length > 0 && !selectedCvId) {
+      const def = cvVersionsData.find(v => v.is_default)
+      if (def) setSelectedCvId(def.id)
+      else setSelectedCvId(cvVersionsData[0].id)
+    }
+  }, [cvVersionsData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function setField(field) {
     return (e) => setForm(f => ({ ...f, [field]: e.target.value }))
@@ -141,7 +141,7 @@ function ApplyPageInner() {
   const [location, setLocation]         = useState('')
   const [source, setSource]             = useState('both')
   const [searching, setSearching]       = useState(false)
-  const [results, setResults]           = useState([])
+  const [results, setResults]           = useState(null)
   const [searchError, setSearchError]   = useState('')
   const [importingId, setImportingId]   = useState(null)
   const [searchSuccess, setSearchSuccess] = useState('')
@@ -183,7 +183,6 @@ function ApplyPageInner() {
       if (sortBy !== 'relevance')      payload.sort_by = sortBy
       const res = await api.post('/jobs/search', payload)
       setResults(res.data)
-      if (res.data.length === 0) setSearchError('No jobs found — try different keywords or location.')
     } catch (err) {
       if (err.response?.status === 429) {
         setSearchError(err.userMessage ?? 'Too many requests. Please slow down and try again shortly.')
@@ -278,6 +277,27 @@ function ApplyPageInner() {
         </div>
       )}
 
+      {/* ── no CV state ── */}
+      {!cvsLoading && !hasCV && (
+        <div className="bg-[#1e1d1c] border border-[#2e2c2a] rounded-xl p-8 text-center">
+          <div className="w-12 h-12 rounded-full bg-[#fd5a04]/10 border border-[#fd5a04]/20 flex items-center justify-center mx-auto mb-4">
+            <span className="text-xl">📄</span>
+          </div>
+          <h2 className="text-base font-semibold text-white mb-2">Upload your CV first</h2>
+          <p className="text-sm text-gray-400 max-w-sm mx-auto mb-5">
+            Loophire needs your CV to tailor it for each job. Upload it once in CV Manager and it will be used for all applications.
+          </p>
+          <Link
+            to="/cv-manager"
+            className="inline-block px-5 py-2.5 bg-[#fd5a04] text-white text-sm font-medium rounded-lg hover:bg-[#e04e03] transition-colors"
+          >
+            Go to CV Manager →
+          </Link>
+        </div>
+      )}
+
+      {(hasCV || cvsLoading) && (<>
+
       {/* ── import panel ── */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
 
@@ -354,7 +374,7 @@ function ApplyPageInner() {
         className={`space-y-5 transition-opacity duration-200 ${isGenerating ? 'opacity-0 pointer-events-none select-none' : 'opacity-100'}`}
       >
         {/* CV selector */}
-        {cvVersions.length > 0 && (
+        {cvVersionsData.length > 0 && (
           <Field label="CV Version">
             <select
               value={selectedCvId ?? ''}
@@ -362,20 +382,13 @@ function ApplyPageInner() {
               disabled={isGenerating}
               className={inputCls}
             >
-              {cvVersions.map(cv => (
+              {cvVersionsData.map(cv => (
                 <option key={cv.id} value={cv.id}>
                   {cv.name}{cv.is_default ? ' (default)' : ''}
                 </option>
               ))}
             </select>
           </Field>
-        )}
-        {cvVersions.length === 0 && (
-          <p className="text-xs text-[var(--color-muted)]">
-            No CV versions found —{' '}
-            <a href="/cv-manager" className="text-[var(--color-accent)] hover:underline">upload one in CV Manager</a>
-            {' '}before generating.
-          </p>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -509,6 +522,8 @@ function ApplyPageInner() {
             : 'Generate application →'}
         </button>
       </form>
+
+      </>)}
 
     </div>
   )
@@ -743,7 +758,23 @@ function SearchJobsTab({
       )}
 
       {/* results */}
-      {results.length > 0 && (
+      {!results && !searching && (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <span className="text-3xl">🔍</span>
+          <p className="text-sm font-medium text-[var(--color-text)]">Search for a job above</p>
+          <p className="text-xs text-[var(--color-muted)]">Enter keywords and location to find matching listings</p>
+        </div>
+      )}
+
+      {results?.length === 0 && !searching && (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <span className="text-3xl">😕</span>
+          <p className="text-sm font-medium text-[var(--color-text)]">No results found</p>
+          <p className="text-xs text-[var(--color-muted)]">Try different keywords, a broader location, or another source</p>
+        </div>
+      )}
+
+      {results?.length > 0 && (
         <ul className="space-y-2 max-h-96 overflow-y-auto pr-1">
           {results.map(job => (
             <JobCard

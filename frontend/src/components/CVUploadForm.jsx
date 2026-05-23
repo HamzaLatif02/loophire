@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import Spinner from './Spinner'
 import api from '../utils/api'
@@ -42,7 +43,6 @@ export default function CVUploadForm({ onSuccess }) {
       setName('')
       setFile(null)
       if (fileRef.current) fileRef.current.value = ''
-      setTimeout(() => onSuccess?.(), 1500)
     } catch (err) {
       setUploadError(err.userMessage ?? err.response?.data?.detail ?? 'Upload failed — please try again.')
     } finally {
@@ -146,11 +146,34 @@ export default function CVUploadForm({ onSuccess }) {
       {uploadError && <p className="text-xs text-[var(--color-danger)]">{uploadError}</p>}
 
       {result && (
-        <div className="p-3 bg-[var(--color-success)]/10 border border-[var(--color-success)]/30 rounded-lg text-xs text-[var(--color-success)]">
-          ✓ Uploaded as &ldquo;{result.name}&rdquo; using{' '}
-          {result.auto_detected
-            ? `auto-detected template: ${result.template_name}`
-            : `${result.template_name} template`}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 p-3 bg-green-900/20 border border-green-800 rounded-lg">
+            <span className="text-green-400">✓</span>
+            <div>
+              <p className="text-sm font-medium text-green-400">CV uploaded successfully</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                &ldquo;{result.name}&rdquo; —{' '}
+                {result.auto_detected
+                  ? `template auto-detected: ${result.template_name}`
+                  : `${result.template_name} template`
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 bg-[#232220] border border-[#2e2c2a] rounded-lg">
+            <span className="text-[#fd5a04] text-lg flex-shrink-0">→</span>
+            <div className="flex-1">
+              <p className="text-xs font-medium text-white">Ready to apply</p>
+              <p className="text-xs text-gray-500">Go to Apply to generate your first tailored application</p>
+            </div>
+            <Link
+              to="/apply"
+              className="px-3 py-1.5 bg-[#fd5a04] text-white text-xs font-medium rounded-md hover:bg-[#e04e03] transition-colors flex-shrink-0"
+            >
+              Apply now →
+            </Link>
+          </div>
         </div>
       )}
 

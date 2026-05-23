@@ -33,7 +33,7 @@ export default function RegisterPage() {
     try {
       const res = await api.post('/auth/register', { email, password })
       setToken(res.data.access_token)
-      navigate('/apply')
+      navigate('/cv-manager?welcome=true')
     } catch (err) {
       setError(err.userMessage ?? err.response?.data?.detail ?? 'Registration failed — please try again.')
     } finally {

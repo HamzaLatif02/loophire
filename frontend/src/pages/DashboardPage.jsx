@@ -6,6 +6,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import DeleteButton from '../components/DeleteButton'
+import DashboardEmptyState from '../components/DashboardEmptyState'
 import ErrorBanner from '../components/ErrorBanner'
 import KanbanBoard from '../components/KanbanBoard'
 import {
@@ -138,21 +139,13 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6">
         <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} isDemo={isDemo} />
-        <div className="rounded-xl border border-dashed border-[var(--color-border)] py-24 text-center space-y-4">
-          <p className="text-4xl">📭</p>
-          <p className="font-semibold text-[var(--color-text)]">No applications yet</p>
-          <p className="text-sm text-[var(--color-muted)] max-w-xs mx-auto">
-            Generate your first application to get started
-          </p>
-          {!isDemo && (
-            <button
-              onClick={() => navigate('/apply')}
-              className="mt-2 px-5 py-2.5 rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-2)] text-white font-semibold text-sm transition-colors"
-            >
-              Start a New Application
-            </button>
-          )}
-        </div>
+        {!isDemo && <DashboardEmptyState />}
+        {isDemo && (
+          <div className="rounded-xl border border-dashed border-[var(--color-border)] py-24 text-center space-y-4">
+            <p className="text-4xl">📭</p>
+            <p className="font-semibold text-[var(--color-text)]">No applications yet</p>
+          </div>
+        )}
       </div>
     )
   }

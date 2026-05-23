@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import CVEditor from '../components/CVEditor'
 import EditableTextArea from '../components/EditableTextArea'
@@ -10,7 +10,7 @@ import { ApplicationDetailSkeleton } from '../components/skeletons/ApplicationDe
 import Spinner from '../components/Spinner'
 import DeleteButton from '../components/DeleteButton'
 import DemoBlockedMessage from '../components/DemoBlockedMessage'
-import { KEYS, useApplication, useUpdateApplication, useUpdateStatus } from '../hooks/useApplications'
+import { KEYS, useApplication, useApplications, useUpdateApplication, useUpdateStatus } from '../hooks/useApplications'
 import { useGenerationProgress } from '../hooks/useGenerationProgress'
 import useDemoGuard from '../hooks/useDemoGuard'
 import api from '../utils/api'
@@ -84,6 +84,8 @@ export default function ApplicationDetailPage() {
   const queryClient = useQueryClient()
 
   const { data: app, isLoading: loading, error: fetchError } = useApplication(id)
+  const { data: allApps = [] } = useApplications()
+  const isFirstApp = allApps.length === 1
   const updateApplication = useUpdateApplication()
   const updateStatus = useUpdateStatus()
 
@@ -289,6 +291,23 @@ export default function ApplicationDetailPage() {
         </svg>
         Dashboard
       </button>
+
+      {/* ── first-app celebration banner ── */}
+      {isFirstApp && (
+        <div className="flex items-center gap-3 p-3 bg-[#1e1d1c] border border-[#2e2c2a] rounded-lg">
+          <span className="text-lg">🎉</span>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-white">First application generated!</p>
+            <p className="text-xs text-gray-500">Review your tailored CV and cover letter below, then track it in your dashboard.</p>
+          </div>
+          <Link
+            to="/applications"
+            className="text-xs text-[#fd5a04] hover:underline flex-shrink-0"
+          >
+            View dashboard →
+          </Link>
+        </div>
+      )}
 
       {/* ── header card ── */}
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">

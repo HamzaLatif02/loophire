@@ -107,13 +107,14 @@ export function useDeleteApplication() {
   })
 }
 
-export function useCVVersions() {
+export function useCVVersions({ enabled = true } = {}) {
   return useQuery({
     queryKey: KEYS.cvVersions,
     queryFn:  async () => {
       const { data } = await api.get('/cvs')
       return data
     },
+    enabled,
   })
 }
 

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useCVVersions } from '../hooks/useApplications'
 import CVUploadForm from '../components/CVUploadForm'
 import CVCard from '../components/CVCard'
 import CVViewer from '../components/CVViewer'
+import CVManagerEmptyState from '../components/CVManagerEmptyState'
 import DemoBlockedMessage from '../components/DemoBlockedMessage'
 import useDemoGuard from '../hooks/useDemoGuard'
+import { CVManagerSkeleton } from '../components/skeletons/CVManagerSkeleton'
 
 export default function CVManagerPage() {
   const { data: versions = [], isLoading } = useCVVersions()
@@ -12,6 +15,9 @@ export default function CVManagerPage() {
   const [viewerOpen, setViewerOpen]       = useState(false)
   const [uploadOpen, setUploadOpen]       = useState(false)
   const { guard: guardAdd, visible: addBlocked } = useDemoGuard()
+
+  const [searchParams] = useSearchParams()
+  const isWelcome = searchParams.get('welcome') === 'true'
 
   const selectedCV = versions[selectedIndex] || null
 
@@ -24,6 +30,13 @@ export default function CVManagerPage() {
       setViewerOpen(false)
     }
   }, [versions.length, selectedIndex])
+
+  // Auto-open upload form on first welcome visit
+  useEffect(() => {
+    if (isWelcome && !isLoading && versions.length === 0) {
+      setUploadOpen(true)
+    }
+  }, [isWelcome, isLoading, versions.length])
 
   const handleView = (index) => {
     setSelectedIndex(index)
@@ -38,8 +51,30 @@ export default function CVManagerPage() {
 
   const handleClose = () => setViewerOpen(false)
 
+  const handleEmptyUpload = () => {
+    setUploadOpen(true)
+    setTimeout(() => {
+      document.getElementById('cv-upload-form')?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+  }
+
+  if (isLoading) return <CVManagerSkeleton />
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4">
+
+      {/* Welcome banner */}
+      {isWelcome && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-[#fd5a04]/8 border border-[#fd5a04]/20 mb-5">
+          <span className="text-xl flex-shrink-0">👋</span>
+          <div>
+            <p className="text-sm font-semibold text-white">Welcome to Loophire!</p>
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+              Start by uploading your CV below. Once it's saved, go to Apply to generate your first tailored application.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
@@ -62,7 +97,7 @@ export default function CVManagerPage() {
 
       {/* Upload form — collapsible */}
       {uploadOpen && (
-        <div className="mb-6 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5">
+        <div id="cv-upload-form" className="mb-6 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-5">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-medium text-[var(--color-text)]">Upload new CV</h2>
             <button
@@ -81,10 +116,8 @@ export default function CVManagerPage() {
 
         {/* LEFT — CV list */}
         <div className={`flex-shrink-0 ${viewerOpen ? 'w-full md:w-[320px] lg:w-[360px]' : 'w-full max-w-2xl mx-auto'}`}>
-          {isLoading ? (
-            <CVListSkeleton />
-          ) : versions.length === 0 ? (
-            <EmptyState onUpload={() => setUploadOpen(true)} />
+          {versions.length === 0 ? (
+            <CVManagerEmptyState onUpload={handleEmptyUpload} />
           ) : (
             <div className="flex flex-col gap-3">
 
@@ -140,33 +173,6 @@ export default function CVManagerPage() {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function EmptyState({ onUpload }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 gap-4 bg-[var(--color-surface)] rounded-xl border border-dashed border-[var(--color-border)]">
-      <p className="text-[var(--color-muted)] text-sm text-center">No CVs uploaded yet</p>
-      <button
-        onClick={onUpload}
-        className="px-4 py-2 bg-[var(--color-accent)] text-white text-sm rounded-lg hover:bg-[var(--color-accent-2)] transition-colors"
-      >
-        Upload your first CV
-      </button>
-    </div>
-  )
-}
-
-function CVListSkeleton() {
-  return (
-    <div className="flex flex-col gap-3">
-      {[1, 2, 3].map(i => (
-        <div key={i} className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4 animate-pulse">
-          <div className="h-4 bg-[var(--color-surface-2)] rounded w-1/2 mb-2" />
-          <div className="h-3 bg-[var(--color-surface-2)] rounded w-1/3" />
-        </div>
-      ))}
     </div>
   )
 }
