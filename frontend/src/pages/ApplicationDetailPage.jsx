@@ -4,8 +4,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import CVEditor from '../components/CVEditor'
 import EditableTextArea from '../components/EditableTextArea'
 import ErrorBanner from '../components/ErrorBanner'
+import { SafeSection } from '../components/ErrorBoundary'
 import GenerationProgress from '../components/GenerationProgress'
 import NotesEditor from '../components/NotesEditor'
+import QueryError from '../components/QueryError'
 import { ApplicationDetailSkeleton } from '../components/skeletons/ApplicationDetailSkeleton'
 import Spinner from '../components/Spinner'
 import DeleteButton from '../components/DeleteButton'
@@ -83,7 +85,7 @@ export default function ApplicationDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data: app, isLoading: loading, error: fetchError } = useApplication(id)
+  const { data: app, isLoading: loading, error: fetchError, refetch: refetchApp } = useApplication(id)
   const { data: allApps = [] } = useApplications()
   const isFirstApp = allApps.length === 1
   const updateApplication = useUpdateApplication()
@@ -240,6 +242,7 @@ export default function ApplicationDetailPage() {
     <div className="space-y-8 max-w-4xl mx-auto">
 
       {/* ── regeneration overlay ── */}
+      <SafeSection>
       {isRegenerating && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-6">
           <div className="w-full sm:max-w-md">
@@ -253,6 +256,7 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
       )}
+      </SafeSection>
 
       {/* ── confirm regenerate modal ── */}
       {showRegenModal && (
@@ -280,6 +284,8 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
       )}
+
+      <QueryError error={fetchError} onRetry={refetchApp} />
 
       {/* ── back ── */}
       <button
@@ -546,6 +552,7 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
 
+        <SafeSection>
         {activeTab === 0 && (
           app.tailored_cv_json || app.tailored_cv
             ? (
@@ -632,6 +639,7 @@ export default function ApplicationDetailPage() {
             <NotesEditor applicationId={id} initialNotes={app.notes} />
           </div>
         )}
+        </SafeSection>
       </div>
 
     </div>

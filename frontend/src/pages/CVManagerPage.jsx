@@ -6,11 +6,13 @@ import CVCard from '../components/CVCard'
 import CVViewer from '../components/CVViewer'
 import CVManagerEmptyState from '../components/CVManagerEmptyState'
 import DemoBlockedMessage from '../components/DemoBlockedMessage'
+import ErrorBoundary from '../components/ErrorBoundary'
+import QueryError from '../components/QueryError'
 import useDemoGuard from '../hooks/useDemoGuard'
 import { CVManagerSkeleton } from '../components/skeletons/CVManagerSkeleton'
 
 export default function CVManagerPage() {
-  const { data: versions = [], isLoading } = useCVVersions()
+  const { data: versions = [], isLoading, error: cvsError, refetch: refetchCVs } = useCVVersions()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [viewerOpen, setViewerOpen]       = useState(false)
   const [uploadOpen, setUploadOpen]       = useState(false)
@@ -111,6 +113,8 @@ export default function CVManagerPage() {
         </div>
       )}
 
+      <QueryError error={cvsError} onRetry={refetchCVs} />
+
       {/* Main split layout */}
       <div className={`flex gap-4 ${viewerOpen ? 'flex-col md:flex-row' : 'flex-col'}`}>
 
@@ -143,17 +147,18 @@ export default function CVManagerPage() {
               )}
 
               {versions.map((cv, index) => (
-                <CVCard
-                  key={cv.id}
-                  cv={cv}
-                  isSelected={viewerOpen && index === selectedIndex}
-                  compact={viewerOpen}
-                  onView={() => handleView(index)}
-                  onSelect={() => {
-                    setSelectedIndex(index)
-                    setViewerOpen(true)
-                  }}
-                />
+                <ErrorBoundary key={cv.id} level="card">
+                  <CVCard
+                    cv={cv}
+                    isSelected={viewerOpen && index === selectedIndex}
+                    compact={viewerOpen}
+                    onView={() => handleView(index)}
+                    onSelect={() => {
+                      setSelectedIndex(index)
+                      setViewerOpen(true)
+                    }}
+                  />
+                </ErrorBoundary>
               ))}
             </div>
           )}
@@ -162,14 +167,16 @@ export default function CVManagerPage() {
         {/* RIGHT — CV viewer */}
         {viewerOpen && selectedCV && (
           <div className="flex-1 min-w-0">
-            <CVViewer
-              cv={selectedCV}
-              onClose={handleClose}
-              onPrev={handlePrev}
-              onNext={handleNext}
-              currentIndex={selectedIndex}
-              total={versions.length}
-            />
+            <ErrorBoundary level="section">
+              <CVViewer
+                cv={selectedCV}
+                onClose={handleClose}
+                onPrev={handlePrev}
+                onNext={handleNext}
+                currentIndex={selectedIndex}
+                total={versions.length}
+              />
+            </ErrorBoundary>
           </div>
         )}
       </div>

@@ -7,7 +7,8 @@ import {
 } from 'recharts'
 import DeleteButton from '../components/DeleteButton'
 import DashboardEmptyState from '../components/DashboardEmptyState'
-import ErrorBanner from '../components/ErrorBanner'
+import { SafeSection } from '../components/ErrorBoundary'
+import QueryError from '../components/QueryError'
 import KanbanBoard from '../components/KanbanBoard'
 import {
   ChartSkeleton, InsightsSkeleton, InterviewsSkeleton, KanbanSkeleton, StatsSkeleton, TableSkeleton,
@@ -52,6 +53,7 @@ export default function DashboardPage() {
     data: apps = [],
     isLoading: appsLoading,
     error: appsError,
+    refetch: refetchApps,
     dataUpdatedAt,
   } = useApplications()
 
@@ -157,88 +159,94 @@ export default function DashboardPage() {
 
       <PageHeader navigate={navigate} dataUpdatedAt={dataUpdatedAt} view={view} onSwitchView={switchView} isDemo={isDemo} />
 
-      {appsError && (
-        <ErrorBanner message={appsError.response?.data?.error ?? appsError.response?.data?.detail ?? 'Failed to load applications.'} />
-      )}
+      <QueryError error={appsError} onRetry={refetchApps} />
 
       {/* ── upcoming interviews ── */}
-      {appsLoading
-        ? <InterviewsSkeleton />
-        : <UpcomingInterviewsCard interviews={upcomingInterviews} navigate={navigate} />
-      }
+      <SafeSection>
+        {appsLoading
+          ? <InterviewsSkeleton />
+          : <UpcomingInterviewsCard interviews={upcomingInterviews} navigate={navigate} />
+        }
+      </SafeSection>
 
       {/* ── stats bar ── */}
-      {appsLoading
-        ? <StatsSkeleton />
-        : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatCard label="Total" value={stats.total} />
-            <StatCard
-              label="Avg Fit Score"
-              value={stats.avg != null ? stats.avg : '—'}
-              valueColor={stats.avg != null ? fitColor(stats.avg) : undefined}
-            />
-            <StatCard label="Applied"      value={stats.byStatus.applied}      accent="blue" />
-            <StatCard label="Interviewing" value={stats.byStatus.interviewing} accent="orange" />
-            <StatCard label="Offers"       value={stats.byStatus.offer}        accent="green" />
-            <StatCard label="Rejected"     value={stats.byStatus.rejected}     accent="red" />
-          </div>
-        )
-      }
+      <SafeSection>
+        {appsLoading
+          ? <StatsSkeleton />
+          : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <StatCard label="Total" value={stats.total} />
+              <StatCard
+                label="Avg Fit Score"
+                value={stats.avg != null ? stats.avg : '—'}
+                valueColor={stats.avg != null ? fitColor(stats.avg) : undefined}
+              />
+              <StatCard label="Applied"      value={stats.byStatus.applied}      accent="blue" />
+              <StatCard label="Interviewing" value={stats.byStatus.interviewing} accent="orange" />
+              <StatCard label="Offers"       value={stats.byStatus.offer}        accent="green" />
+              <StatCard label="Rejected"     value={stats.byStatus.rejected}     accent="red" />
+            </div>
+          )
+        }
+      </SafeSection>
 
       {/* ── A/B insights ── */}
-      {analyticsLoading
-        ? <InsightsSkeleton />
-        : analytics && analytics.total_applications > 0
-          ? <ABInsightsSection analytics={analytics} />
-          : null
-      }
+      <SafeSection>
+        {analyticsLoading
+          ? <InsightsSkeleton />
+          : analytics && analytics.total_applications > 0
+            ? <ABInsightsSection analytics={analytics} />
+            : null
+        }
+      </SafeSection>
 
       {/* ── chart ── */}
-      {appsLoading
-        ? <ChartSkeleton />
-        : chartData.length > 0 && (
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--color-border)]">
-              <h2 className="text-sm font-semibold text-[var(--color-text)]">Fit Scores</h2>
-              <p className="text-xs text-[var(--color-muted)] mt-0.5">Last {chartData.length} scored applications</p>
-            </div>
-            <div className="p-5 overflow-x-auto">
-              <div className="min-w-[480px] h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} barCategoryGap="30%">
-                    <CartesianGrid
-                      vertical={false}
-                      stroke="var(--color-border)"
-                      strokeDasharray="3 3"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      domain={[0, 100]}
-                      ticks={[0, 25, 50, 75, 100]}
-                      tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={28}
-                    />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
-                    <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                      {chartData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} fillOpacity={0.85} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+      <SafeSection>
+        {appsLoading
+          ? <ChartSkeleton />
+          : chartData.length > 0 && (
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+              <div className="px-5 py-4 border-b border-[var(--color-border)]">
+                <h2 className="text-sm font-semibold text-[var(--color-text)]">Fit Scores</h2>
+                <p className="text-xs text-[var(--color-muted)] mt-0.5">Last {chartData.length} scored applications</p>
+              </div>
+              <div className="p-5 overflow-x-auto">
+                <div className="min-w-[480px] h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} barCategoryGap="30%">
+                      <CartesianGrid
+                        vertical={false}
+                        stroke="var(--color-border)"
+                        strokeDasharray="3 3"
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        ticks={[0, 25, 50, 75, 100]}
+                        tick={{ fontSize: 11, fill: 'var(--color-muted)', fontFamily: 'system-ui' }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={28}
+                      />
+                      <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-surface-2)' }} />
+                      <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} fillOpacity={0.85} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
-          </div>
-        )
-      }
+          )
+        }
+      </SafeSection>
 
       {/* ── table controls ── */}
       {!appsLoading && apps.length > 0 && view === 'table' && (
@@ -264,6 +272,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── applications — table or kanban ── */}
+      <SafeSection>
       {appsLoading
         ? (view === 'kanban' ? <KanbanSkeleton /> : <TableSkeleton rows={5} />)
         : view === 'kanban'
@@ -424,6 +433,7 @@ export default function DashboardPage() {
               )
               : null
       }
+      </SafeSection>
 
     </div>
   )

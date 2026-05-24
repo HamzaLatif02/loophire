@@ -2,6 +2,7 @@ import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import DeleteButton from './DeleteButton'
+import ErrorBoundary from './ErrorBoundary'
 import { KEYS } from '../hooks/useApplications'
 import api from '../utils/api'
 
@@ -90,7 +91,9 @@ function KanbanColumn({ column, applications }) {
             }`}
           >
             {applications.map((app, index) => (
-              <KanbanCard key={app.id} app={app} index={index} />
+              <ErrorBoundary key={app.id} level="card">
+                <KanbanCard app={app} index={index} />
+              </ErrorBoundary>
             ))}
             {provided.placeholder}
             {applications.length === 0 && !snapshot.isDraggingOver && (
