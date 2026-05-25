@@ -64,7 +64,12 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-def generate_interview_prep(job_description: str, cv_text: str) -> dict:
+def generate_interview_prep(
+    job_description: str,
+    cv_text: str,
+    user_id: Optional[int] = None,
+    application_id: Optional[int] = None,
+) -> dict:
     """Generate structured interview questions for a role/CV combination."""
     from utils.sanitiser import check_prompt_injection, sanitise_text
     cv_text = sanitise_text(cv_text, "cv_text")
@@ -97,6 +102,10 @@ def generate_interview_prep(job_description: str, cv_text: str) -> dict:
     elapsed = time.monotonic() - t0
     log_cache_stats(logger, "interview_agent", response.usage)
     logger.info("interview_agent: completed in %.1fs", elapsed)
+
+    if user_id:
+        from services.usage_service import log_api_call
+        log_api_call(user_id, "interview_agent", _MODEL, response.usage, application_id)
 
     raw = response.content[0].text
     if not raw.strip():

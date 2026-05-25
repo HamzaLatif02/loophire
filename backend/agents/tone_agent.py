@@ -50,7 +50,11 @@ _SYSTEM = (
 _PROMPT_PREFIX = "Analyse the tone of the job description below.\n\n--- JOB DESCRIPTION ---\n"
 
 
-def analyse_tone(job_description: str) -> dict:
+def analyse_tone(
+    job_description: str,
+    user_id: Optional[int] = None,
+    application_id: Optional[int] = None,
+) -> dict:
     """Analyse the tone of a job description and return structured guidance."""
     from utils.sanitiser import sanitise_text
     job_description = sanitise_text(job_description, "job_description")
@@ -71,6 +75,10 @@ def analyse_tone(job_description: str) -> dict:
 
     log_cache_stats(logger, "tone_agent", message.usage)
     logger.info("tone_agent: completed in %.1fs", time.monotonic() - t0)
+
+    if user_id:
+        from services.usage_service import log_api_call
+        log_api_call(user_id, "tone_agent", _MODEL, message.usage, application_id)
 
     raw = message.content[0].text.strip()
     if not raw:

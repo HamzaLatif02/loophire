@@ -83,19 +83,25 @@ async def run_generation_pipeline(
 
         await p.send_progress(job_id, "research", "Researching the company…", 20)
         try:
-            company_research = await asyncio.to_thread(research_company, body.company_name)
+            company_research = await asyncio.to_thread(
+                research_company, body.company_name, user_id
+            )
         except Exception:
             company_research = None
 
         await p.send_progress(job_id, "tone", "Analysing job description tone…", 36)
         tone_result: Optional[dict] = None
         try:
-            tone_result = await asyncio.to_thread(analyse_tone, body.job_description)
+            tone_result = await asyncio.to_thread(
+                analyse_tone, body.job_description, user_id
+            )
         except Exception as exc:
             logger.warning("pipeline[%s]: tone analysis failed (non-fatal): %s", job_id, exc)
 
         await p.send_progress(job_id, "fit", "Scoring your fit for this role…", 54)
-        fit_analysis = await asyncio.to_thread(analyse_fit, cv_text, body.job_description)
+        fit_analysis = await asyncio.to_thread(
+            analyse_fit, cv_text, body.job_description, user_id
+        )
 
         written: Optional[dict] = None
         if do_write:
@@ -112,6 +118,7 @@ async def run_generation_pipeline(
                 user_preferences=user_preferences,
                 cv_links=cv_links,
                 tone_analysis=tone_result,
+                user_id=user_id,
             )
             if body.rewrite_cv and body.generate_cover_letter:
                 await p.send_progress(job_id, "cover_letter", "Cover letter written.", 84)
@@ -219,19 +226,25 @@ async def run_regeneration_pipeline(
 
         await p.send_progress(job_id, "research", "Researching the company…", 18)
         try:
-            company_research = await asyncio.to_thread(research_company, company_name)
+            company_research = await asyncio.to_thread(
+                research_company, company_name, user_id, application_id
+            )
         except Exception:
             company_research = None
 
         await p.send_progress(job_id, "tone", "Analysing job description tone…", 34)
         tone_result: Optional[dict] = None
         try:
-            tone_result = await asyncio.to_thread(analyse_tone, job_description)
+            tone_result = await asyncio.to_thread(
+                analyse_tone, job_description, user_id, application_id
+            )
         except Exception as exc:
             logger.warning("regen[%s]: tone analysis failed (non-fatal): %s", job_id, exc)
 
         await p.send_progress(job_id, "fit", "Scoring your fit for this role…", 50)
-        fit_analysis = await asyncio.to_thread(analyse_fit, cv_text, job_description)
+        fit_analysis = await asyncio.to_thread(
+            analyse_fit, cv_text, job_description, user_id, application_id
+        )
 
         await p.send_progress(job_id, "cv_tailor", "Tailoring your CV…", 66)
         written = await asyncio.to_thread(
@@ -243,6 +256,8 @@ async def run_regeneration_pipeline(
             user_preferences=user_preferences,
             cv_links=cv_links,
             tone_analysis=tone_result,
+            user_id=user_id,
+            application_id=application_id,
         )
 
         await p.send_progress(job_id, "cover_letter", "Cover letter written.", 84)
@@ -681,7 +696,10 @@ def create_interview_prep(
         raise HTTPException(status_code=400, detail="No CV text available — upload a CV first.")
 
     try:
-        prep = generate_interview_prep(application.job_description, cv_text)
+        prep = generate_interview_prep(
+            application.job_description, cv_text,
+            user_id=current_user.id, application_id=application_id,
+        )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"Interview prep generation failed: {exc}")
 

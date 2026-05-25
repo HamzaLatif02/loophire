@@ -6,6 +6,18 @@ export const KEYS = {
   application:  (id) => ['applications', String(id)],
   analytics:    ['analytics'],
   cvVersions:   ['cv-versions'],
+  usage:        ['usage'],
+}
+
+export function useUsage() {
+  return useQuery({
+    queryKey: KEYS.usage,
+    queryFn:  async () => {
+      const { data } = await api.get('/api/usage')
+      return data
+    },
+    staleTime: 1000 * 60 * 5,
+  })
 }
 
 export function useApplications() {

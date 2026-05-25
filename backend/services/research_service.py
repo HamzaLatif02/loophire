@@ -104,7 +104,11 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-def research_company(company_name: str) -> Optional[dict]:
+def research_company(
+    company_name: str,
+    user_id: Optional[int] = None,
+    application_id: Optional[int] = None,
+) -> Optional[dict]:
     """Search for company information and return a structured research dict.
 
     Returns None if no API keys are configured or all searches fail.
@@ -156,6 +160,10 @@ def research_company(company_name: str) -> Optional[dict]:
     elapsed = time.monotonic() - t0
     log_cache_stats(logger, "research_service", message.usage)
     logger.info("research: synthesis completed in %.1fs", elapsed)
+
+    if user_id:
+        from services.usage_service import log_api_call
+        log_api_call(user_id, "research_agent", _MODEL, message.usage, application_id)
 
     raw = message.content[0].text.strip()
     cleaned = _strip_fences(raw)

@@ -132,7 +132,8 @@ def _format_links_context(cv_links: Optional[List[dict]]) -> str:
     return "\n".join(lines)
 
 
-def _call_claude(label: str, system_text: str, content_blocks: list, max_tokens: int) -> str:
+def _call_claude(label: str, system_text: str, content_blocks: list, max_tokens: int):
+    """Returns (text, usage) tuple."""
     logger.info("writer_agent[%s]: calling %s (max_tokens=%d)", label, _MODEL, max_tokens)
     t0 = time.monotonic()
 
@@ -156,7 +157,7 @@ def _call_claude(label: str, system_text: str, content_blocks: list, max_tokens:
     result = message.content[0].text.strip()
     if not result:
         raise RuntimeError(f"Claude returned an empty response for '{label}'")
-    return result
+    return result, message.usage
 
 
 def _parse_json_response(text: str) -> dict:
@@ -222,6 +223,8 @@ def write_application(
     user_preferences: Optional[dict] = None,
     cv_links: Optional[List[dict]] = None,
     tone_analysis: Optional[dict] = None,
+    user_id: Optional[int] = None,
+    application_id: Optional[int] = None,
 ) -> dict:
     """Rewrite a CV as structured JSON and draft a tone-matched cover letter."""
     from utils.sanitiser import check_prompt_injection, sanitise_text
@@ -297,7 +300,11 @@ JSON SCHEMA (return exactly this structure):
         ),
     ]
 
-    cv_raw = _call_claude("cv", cv_system, cv_blocks, max_tokens=4096)
+    cv_raw, cv_usage = _call_claude("cv", cv_system, cv_blocks, max_tokens=4096)
+
+    if user_id:
+        from services.usage_service import log_api_call
+        log_api_call(user_id, "writer_agent_cv", _MODEL, cv_usage, application_id)
 
     try:
         tailored_cv_json = _parse_json_response(cv_raw)
@@ -331,7 +338,11 @@ RULES:
             f"--- FIT ANALYSIS ---\n{fit_summary}\n\n{company_context}\n\n--- JOB DESCRIPTION ---\n{job_description}"
         ),
     ]
-    cover_letter = _call_claude("cover_letter", cover_system, cover_blocks, max_tokens=1024)
+    cover_letter, cl_usage = _call_claude("cover_letter", cover_system, cover_blocks, max_tokens=1024)
+
+    if user_id:
+        from services.usage_service import log_api_call
+        log_api_call(user_id, "writer_agent_cl", _MODEL, cl_usage, application_id)
 
     return {
         "tailored_cv": tailored_cv_text,

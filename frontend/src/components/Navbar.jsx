@@ -8,6 +8,7 @@ const links = [
   { to: '/apply',        label: 'New Application' },
   { to: '/applications', label: 'Dashboard' },
   { to: '/cv-manager',   label: 'CV Manager' },
+  { to: '/usage',        label: 'Usage', demoHidden: true },
 ]
 
 export default function Navbar() {
@@ -68,7 +69,7 @@ export default function Navbar() {
             {/* ── Desktop nav ── */}
             <div className="hidden lg:flex items-center gap-1">
               <nav className="flex items-center gap-1">
-                {links.map(({ to, label }) => (
+                {links.filter(l => !(l.demoHidden && isDemo)).map(({ to, label }) => (
                   <NavLink
                     key={to}
                     to={to}
@@ -123,7 +124,7 @@ export default function Navbar() {
             {/* ── Mobile dropdown ── */}
             {menuOpen && (
               <div className="lg:hidden absolute top-full left-0 right-0 bg-[#1a1918] border-t border-[var(--color-border)] shadow-xl z-50">
-                {links.map(({ to, label }) => (
+                {links.filter(l => !(l.demoHidden && isDemo)).map(({ to, label }) => (
                   <NavLink
                     key={to}
                     to={to}

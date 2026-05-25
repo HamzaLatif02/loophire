@@ -12,6 +12,7 @@ const ApplyPage             = lazy(() => import('./pages/ApplyPage'))
 const DashboardPage         = lazy(() => import('./pages/DashboardPage'))
 const ApplicationDetailPage = lazy(() => import('./pages/ApplicationDetailPage'))
 const CVManagerPage         = lazy(() => import('./pages/CVManagerPage'))
+const UsagePage             = lazy(() => import('./pages/UsagePage'))
 const NotFoundPage          = lazy(() => import('./pages/NotFoundPage'))
 
 export default function App() {
@@ -70,6 +71,13 @@ export default function App() {
           <PrivateRoute>
             <ErrorBoundary level="page">
               <CVManagerPage />
+            </ErrorBoundary>
+          </PrivateRoute>
+        } />
+        <Route path="/usage" element={
+          <PrivateRoute>
+            <ErrorBoundary level="page">
+              <UsagePage />
             </ErrorBoundary>
           </PrivateRoute>
         } />

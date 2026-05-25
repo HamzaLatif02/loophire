@@ -49,7 +49,12 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-def analyse_fit(cv_text: str, job_description: str) -> dict:
+def analyse_fit(
+    cv_text: str,
+    job_description: str,
+    user_id: Optional[int] = None,
+    application_id: Optional[int] = None,
+) -> dict:
     """Score a CV against a job description and return structured analysis."""
     from utils.sanitiser import check_prompt_injection, sanitise_text
     cv_text = sanitise_text(cv_text, "cv_text")
@@ -82,6 +87,10 @@ def analyse_fit(cv_text: str, job_description: str) -> dict:
     elapsed = time.monotonic() - t0
     log_cache_stats(logger, "fit_agent", response.usage)
     logger.info("fit_agent: completed in %.1fs", elapsed)
+
+    if user_id:
+        from services.usage_service import log_api_call
+        log_api_call(user_id, "fit_agent", _MODEL, response.usage, application_id)
 
     raw = response.content[0].text
     cleaned = _strip_fences(raw)
