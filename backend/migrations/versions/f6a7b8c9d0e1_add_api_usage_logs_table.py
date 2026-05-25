@@ -1,15 +1,15 @@
 """add api_usage_logs table
 
-Revision ID: a1b2c3d4e5f6
-Revises: f5a6b7c8d9e0
+Revision ID: f6a7b8c9d0e1
+Revises: d4e5f6a7b8c9
 Create Date: 2026-05-25 00:00:00.000000
 
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'a1b2c3d4e5f6'
-down_revision = 'f5a6b7c8d9e0'
+revision = 'f6a7b8c9d0e1'
+down_revision = 'd4e5f6a7b8c9'
 branch_labels = None
 depends_on = None
 
