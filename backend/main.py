@@ -200,3 +200,39 @@ def debug_pdf_test():
     except Exception as exc:
         import traceback
         return {"ok": False, "error": str(exc), "traceback": traceback.format_exc()}
+
+
+@app.get("/api/debug/export-cv/{app_id}")
+def debug_export_cv(app_id: int, request: Request):
+    """Temporary debug export — returns error details instead of raw PDF."""
+    import traceback
+    from database import get_db
+    from dependencies.auth_dependency import get_current_user
+    from models.application import Application
+    from services.latex_export_service import generate_cv_pdf
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return {"error": "no token"}
+    token = auth_header[7:]
+    try:
+        from jose import jwt
+        import os
+        payload = jwt.decode(token, os.getenv("SECRET_KEY", ""), algorithms=["HS256"])
+        user_id = payload.get("sub")
+    except Exception as e:
+        return {"error": f"token decode: {e}"}
+    db = next(get_db())
+    try:
+        app = db.query(Application).filter(Application.id == app_id, Application.user_id == int(user_id)).first()
+        if not app:
+            return {"error": "not found"}
+        tcj = app.tailored_cv_json
+        if not tcj:
+            return {"error": "no tailored_cv_json"}
+        try:
+            pdf = generate_cv_pdf(tcj, template_id="classic")
+            return {"ok": True, "size": len(pdf), "valid": pdf[:4] == b"%PDF"}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "traceback": traceback.format_exc()}
+    finally:
+        db.close()
