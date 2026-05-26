@@ -181,3 +181,22 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": "qa-2026-05-26"}
+
+
+@app.get("/api/debug/pdf-test")
+def debug_pdf_test():
+    """Temporary debug endpoint — tests reportlab CV PDF generation."""
+    try:
+        from services.pdf_export_service import generate_cv_pdf_reportlab
+        data = {
+            "profile": "Test profile paragraph.",
+            "technical_skills": [{"category": "Languages", "items": "Python, TypeScript"}],
+            "education": [{"institution": "UCL", "degree": "BSc CS", "dates": "2020-2024", "highlights": ["First class"]}],
+            "experience": [{"title": "SWE", "company": "Acme", "dates": "2024-now", "highlights": ["Built APIs"]}],
+            "projects": [{"name": "Loophire", "github_url": "https://github.com/HamzaLatif02/loophire", "live_url": "", "highlights": ["AI tool"]}],
+        }
+        pdf = generate_cv_pdf_reportlab(data)
+        return {"ok": True, "size": len(pdf), "valid": pdf[:4] == b"%PDF"}
+    except Exception as exc:
+        import traceback
+        return {"ok": False, "error": str(exc), "traceback": traceback.format_exc()}
