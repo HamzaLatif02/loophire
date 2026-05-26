@@ -22,6 +22,9 @@ def generate_cv_pdf(tailored_content: dict, template_id: str = "classic") -> byt
     """
     Render a structured CV dict as a PDF.
 
+    Tries pdflatex first for best quality; falls back to reportlab automatically
+    when pdflatex is not installed (e.g. on Railway/cloud environments).
+
     template_id: "classic" | "minimal" | "two_column" | "compact"
     tailored_content keys:
       profile          str
@@ -30,41 +33,43 @@ def generate_cv_pdf(tailored_content: dict, template_id: str = "classic") -> byt
       experience       list of {title, company, dates, highlights}
       projects         list of {name, github_url, live_url, highlights}
     """
-    # Lazy import avoids circular dependency between this module and cv_templates
-    from services.cv_templates import build_latex_for_template
-    if template_id and template_id != "classic":
-        latex = build_latex_for_template(template_id, tailored_content)
-    else:
-        latex = build_latex(tailored_content)
+    try:
+        from services.cv_templates import build_latex_for_template
+        if template_id and template_id != "classic":
+            latex = build_latex_for_template(template_id, tailored_content)
+        else:
+            latex = build_latex(tailored_content)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tex_path = os.path.join(tmpdir, "cv.tex")
-        pdf_path = os.path.join(tmpdir, "cv.pdf")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tex_path = os.path.join(tmpdir, "cv.tex")
+            pdf_path = os.path.join(tmpdir, "cv.pdf")
 
-        with open(tex_path, "w", encoding="utf-8") as f:
-            f.write(latex)
+            with open(tex_path, "w", encoding="utf-8") as f:
+                f.write(latex)
 
-        result = None
-        for _ in range(2):
-            result = subprocess.run(
-                ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmpdir, tex_path],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
+            result = None
+            for _ in range(2):
+                result = subprocess.run(
+                    ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmpdir, tex_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
 
-        if not os.path.exists(pdf_path):
-            logger.error(
-                "pdflatex failed.\nSTDOUT: %s\nSTDERR: %s",
+            if os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as f:
+                    return f.read()
+
+            logger.warning(
+                "pdflatex produced no output — falling back to reportlab.\nSTDOUT: %s\nSTDERR: %s",
                 result.stdout if result else "",
                 result.stderr if result else "",
             )
-            raise RuntimeError(
-                f"PDF generation failed.\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-            )
+    except Exception as exc:
+        logger.warning("pdflatex unavailable or failed (%s) — using reportlab fallback", exc)
 
-        with open(pdf_path, "rb") as f:
-            return f.read()
+    from services.pdf_export_service import generate_cv_pdf_reportlab
+    return generate_cv_pdf_reportlab(tailored_content)
 
 
 def escape_latex(text: str) -> str:

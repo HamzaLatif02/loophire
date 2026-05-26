@@ -756,8 +756,8 @@ def export_cv(
 
     try:
         pdf = generate_cv_pdf(app.tailored_cv_json, template_id=effective_template)
-    except RuntimeError as exc:
-        logger.error("LaTeX PDF generation failed for application %d: %s", application_id, exc)
+    except Exception as exc:
+        logger.error("CV PDF generation failed for application %d: %s", application_id, exc)
         raise HTTPException(
             status_code=500,
             detail="PDF generation failed — please try again or contact support",
