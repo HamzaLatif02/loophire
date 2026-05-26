@@ -745,14 +745,7 @@ def export_cv(
     if not app.tailored_cv_json:
         raise HTTPException(status_code=404, detail="No tailored CV available for this application.")
 
-    # Determine effective template: explicit override > CV version default > classic
-    effective_template = "classic"
-    if template_id:
-        effective_template = template_id
-    elif app.cv_version_id:
-        cv_ver = db.query(CVVersion).filter(CVVersion.id == app.cv_version_id).first()
-        if cv_ver and cv_ver.template_id:
-            effective_template = cv_ver.template_id
+    effective_template = template_id or "classic"
 
     try:
         pdf = generate_cv_pdf(app.tailored_cv_json, template_id=effective_template)
