@@ -180,4 +180,4 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "qa-2026-05-26"}
