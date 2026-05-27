@@ -12,6 +12,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql)
 ![Claude API](https://img.shields.io/badge/Claude-API-orange?style=flat-square)
 ![Railway](https://img.shields.io/badge/Deployed-Railway-purple?style=flat-square)
+![Live Demo](https://img.shields.io/badge/Demo-Live-orange?style=flat-square)
 
 ---
 
@@ -34,7 +35,9 @@ AI pipeline that produces:
 - A **formatted PDF** using the user's original LaTeX template
 
 All of this runs in under 30 seconds with real-time
-WebSocket progress updates.
+WebSocket progress updates. A one-click demo at
+[loophire.xyz](https://loophire.xyz) lets employers
+explore the full product instantly — no signup required.
 
 ---
 
@@ -101,7 +104,7 @@ WebSocket progress updates.
 | Tone analysis | Detects formal / startup / technical / corporate from JD |
 | Company research | Live Tavily web search synthesised by Claude |
 | Interview prep | Role-specific technical and behavioural questions |
-| Generation mode | Users choose: fit only, CV rewrite, cover letter, or all |
+| Generation mode selector | Users choose: fit only, CV rewrite, cover letter, or all three. Shows estimated API cost tier before generating. |
 
 ### Job sourcing
 
@@ -118,11 +121,12 @@ WebSocket progress updates.
 | Feature | Detail |
 |---|---|
 | Dashboard | Table view + Kanban board with drag-and-drop status updates |
+| Delete application | Two-click confirm delete on table, Kanban, and detail page. Optimistic UI update with instant cache removal. |
 | A/B tracking | Records which CV versions get responses vs rejections |
 | Interview tracker | Interview dates, notes, upcoming interview card |
 | Notes | Auto-saving notes field per application (debounced, 1.5s) |
 | Regenerate | Re-run the full pipeline on an existing application |
-| Version history | Tracks which CV version was used per application |
+| CV version tracking | Every application records which CV version was used. Shown as a badge in table, Kanban, and detail view. |
 
 ### CV management
 
@@ -147,6 +151,10 @@ WebSocket progress updates.
 | WebSockets | Real-time 7-stage pipeline progress with per-stage status |
 | Background jobs | FastAPI BackgroundTasks — generation never blocks HTTP |
 | SSRF protection | URL validation blocks localhost and private IP ranges |
+| Error boundaries | React error boundaries on every page, section, and card. Four fallback levels. Crashes show recovery UI, not a blank screen. |
+| Demo mode | One-click employer preview with pre-populated applications. Read-only, anonymised data, resets every 24 hours. No signup required. |
+| Usage analytics | Per-user API usage tracking — calls, tokens, estimated cost, prompt caching savings breakdown, per-agent stats, 30-day activity chart. |
+| Onboarding flow | Post-registration guided flow from CV upload to first application. Empty states, welcome banner, contextual nav hints. |
 
 ---
 
@@ -201,20 +209,23 @@ loophire/
 │   │   └── interview_agent.py    # Interview question generation
 │   │
 │   ├── routers/
-│   │   ├── auth.py               # Register, login, JWT
+│   │   ├── auth.py               # Register, login, JWT, demo login
 │   │   ├── applications.py       # Generate, list, export, WS
 │   │   ├── cv.py                 # Upload, parse, store
 │   │   ├── cvs.py                # Multi-CV manager
 │   │   ├── jobs.py               # Reed + Adzuna search
+│   │   ├── usage.py              # API usage analytics endpoint
 │   │   └── ws.py                 # WebSocket progress endpoint
 │   │
 │   ├── services/
 │   │   ├── cv_parser.py          # pdfplumber PDF parsing
 │   │   ├── cv_templates.py       # 4 LaTeX templates + detector
 │   │   ├── latex_export_service.py # pdflatex PDF generation
+│   │   ├── pdf_export_service.py # reportlab fallback PDF generation
 │   │   ├── research_service.py   # Tavily company research
 │   │   ├── job_search_service.py # Reed + Adzuna integration
-│   │   └── memory_service.py     # Redis agent memory
+│   │   ├── memory_service.py     # Redis agent memory
+│   │   └── usage_service.py      # API call logging + cost calculation
 │   │
 │   ├── utils/
 │   │   ├── auth.py               # JWT + bcrypt helpers
@@ -223,7 +234,7 @@ loophire/
 │   │   ├── progress.py           # WebSocket connection manager
 │   │   └── claude_helpers.py     # Prompt caching helpers
 │   │
-│   ├── models/                   # SQLAlchemy models
+│   ├── models/                   # SQLAlchemy ORM models (User, Application, CVVersion, APIUsageLog)
 │   ├── schemas/                  # Pydantic request schemas
 │   ├── migrations/               # Alembic migration history
 │   ├── tests/
@@ -238,21 +249,28 @@ loophire/
 │   │   │   ├── ApplyPage.jsx
 │   │   │   ├── DashboardPage.jsx
 │   │   │   ├── ApplicationDetailPage.jsx
-│   │   │   └── CVManagerPage.jsx
+│   │   │   ├── CVManagerPage.jsx
+│   │   │   ├── UsagePage.jsx             # API usage + cost analytics
+│   │   │   └── NotFoundPage.jsx          # 404 with navigation links
 │   │   │
 │   │   ├── components/
-│   │   │   ├── KanbanBoard.jsx   # Drag-and-drop board
-│   │   │   ├── CVViewer.jsx      # Split-panel CV reader
-│   │   │   ├── CVCard.jsx        # Template selector + PDF preview
-│   │   │   ├── GenerationProgress.jsx # WebSocket progress UI
-│   │   │   ├── DeleteButton.jsx  # Two-click confirm delete
-│   │   │   ├── NotesEditor.jsx   # Auto-saving notes
-│   │   │   └── skeletons/        # Loading skeleton components
+│   │   │   ├── KanbanBoard.jsx           # Drag-and-drop board
+│   │   │   ├── CVViewer.jsx              # Split-panel CV reader
+│   │   │   ├── CVCard.jsx                # Template selector + PDF preview
+│   │   │   ├── GenerationProgress.jsx    # WebSocket progress UI
+│   │   │   ├── DeleteButton.jsx          # Two-click confirm delete
+│   │   │   ├── NotesEditor.jsx           # Auto-saving notes
+│   │   │   ├── ErrorBoundary.jsx         # 4-level error recovery system
+│   │   │   ├── DemoBanner.jsx            # Read-only demo mode indicator
+│   │   │   ├── DashboardEmptyState.jsx   # Guided empty state for new users
+│   │   │   ├── CVManagerEmptyState.jsx   # CV upload prompt for new users
+│   │   │   └── skeletons/               # Loading skeleton components
 │   │   │
 │   │   ├── hooks/
-│   │   │   ├── useApplications.js     # React Query hooks
-│   │   │   ├── useGenerationProgress.js # WebSocket hook
-│   │   │   └── usePdfAction.js        # PDF fetch/download
+│   │   │   ├── useApplications.js        # React Query hooks
+│   │   │   ├── useGenerationProgress.js  # WebSocket hook
+│   │   │   ├── usePdfAction.js           # PDF fetch/download
+│   │   │   └── useDemoGuard.js           # Demo mode action blocking
 │   │   │
 │   │   └── utils/
 │   │       ├── api.js            # Axios instance + interceptors
@@ -276,7 +294,7 @@ loophire/
 
 ```
 User
-├── id, email, password_hash, is_active, created_at
+├── id, email, password_hash, is_active, is_demo, created_at
 ├── base_cv_text, cv_links, preferences
 └── → CVVersion[] (one-to-many)
 
@@ -298,6 +316,13 @@ Application
 ├── notes, rewrite_cv, cover_letter_generated
 └── last_generated_at, created_at
 
+APIUsageLog
+├── id, user_id, created_at
+├── agent_name, model
+├── input_tokens, output_tokens
+├── cache_creation_tokens, cache_read_tokens
+└── application_id (nullable FK)
+
 AgentMemory
 └── id, user_id, memory_type, content (JSON)
 ```
@@ -312,6 +337,7 @@ Key endpoints — full docs at `https://api.loophire.xyz/docs`
 POST   /api/auth/register           Register new user
 POST   /api/auth/login              Login, returns JWT
 GET    /api/auth/me                 Current user info
+POST   /api/auth/demo               One-click demo login (no credentials)
 
 POST   /api/cv/upload               Upload and parse CV PDF
 GET    /api/cv                      Get stored CV text
@@ -324,6 +350,7 @@ POST   /api/applications/generate   Start AI pipeline (async)
 GET    /api/applications            List all applications
 GET    /api/applications/{id}       Application detail
 PATCH  /api/applications/{id}       Update CV/cover letter/notes
+DELETE /api/applications/{id}       Delete an application
 POST   /api/applications/{id}/regenerate  Re-run pipeline
 GET    /api/applications/{id}/export/cv   Download tailored CV
 GET    /api/applications/analytics  A/B response analytics
@@ -332,6 +359,8 @@ WS     /ws/progress/{job_id}        Real-time pipeline progress
 POST   /api/jobs/search             Search Reed + Adzuna
 POST   /api/jobs/import             Import job by ID
 POST   /api/applications/scrape-job Import from LinkedIn URL
+
+GET    /api/usage                   Usage analytics + cost data
 ```
 
 ---
@@ -460,7 +489,7 @@ VITE_API_URL=http://localhost:8000
 ```bash
 cd backend
 python tests/e2e_test.py
-# Runs 30+ automated tests against the live API
+# Runs 40 automated tests against the live API
 # Covers: auth, CV upload, generation, PDF export,
 #         analytics, job search, rate limiting, security
 ```
@@ -557,6 +586,13 @@ optimistic updates out of the box — no reducers needed.
    subsequent feature (Kanban, extension, templates,
    multi-CV) was validated against real use before being
    built.
+
+6. **Ship the demo, not just the product** — an employer
+   who has to register before seeing anything will not
+   register. A one-click demo with realistic pre-populated
+   data communicated the product's value in seconds. The
+   hardest part was anonymising the seed data convincingly,
+   not the technical implementation.
 
 ---
 
