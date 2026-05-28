@@ -25,6 +25,8 @@ const ICONS = {
   notes:    "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
   cv:       "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
   ext:      "M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8H4a1 1 0 00-1 1v10a1 1 0 001 1h3m10-11h1a1 1 0 011 1v10a1 1 0 01-1 1h-1",
+  play:     "M5 3l14 9-14 9V3z",
+  pie:      ["M21.21 15.89A10 10 0 118 2.83", "M22 12A10 10 0 0012 2v10z"],
   github:   "M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22",
   arrow:    "M13 7l5 5m0 0l-5 5m5-5H6",
   linkedin: "M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z",
@@ -161,7 +163,8 @@ function HeroSection() {
 
         <p className="text-lg sm:text-xl text-[var(--color-muted)] leading-relaxed max-w-2xl mx-auto">
           Loophire is an AI job application agent. Upload your CV once — it researches the company,
-          tailors your CV, and writes a personalised cover letter in under 60 seconds.
+          tailors your CV, and writes a personalised cover letter in under 60 seconds.{' '}
+          Try it instantly — no signup required.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -196,15 +199,16 @@ function HeroSection() {
 
 function StatsBar() {
   const stats = [
-    { value: '5',    label: 'AI processing stages' },
-    { value: '60s',  label: 'Average generation time' },
-    { value: '100%', label: 'Free to use' },
+    { value: '5',      label: 'AI processing stages' },
+    { value: '60s',    label: 'Average generation time' },
+    { value: '100%',   label: 'Free to use' },
+    { value: '~$0.01', label: 'Per application (with caching)' },
   ]
 
   return (
     <div className="border-y border-[var(--color-border)] bg-[var(--color-surface)]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--color-border)] gap-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-y-0 sm:divide-x divide-[var(--color-border)] gap-0">
           {stats.map(({ value, label }) => (
             <div key={label} className="text-center py-6 sm:py-0">
               <p className="text-4xl font-black text-[var(--color-accent)]">{value}</p>
@@ -245,6 +249,11 @@ const STEPS = [
     title: 'Cover letter written',
     desc: 'A polished, personalised cover letter is generated — grounded in your CV, the job spec, and the company research.',
   },
+  {
+    icon: ICONS.check,
+    title: 'Track everything',
+    desc: 'Log interview dates, notes, and outcomes. The dashboard tracks response rates, application history, and API usage so you always know what the tool is doing for you.',
+  },
 ]
 
 function HowItWorksSection() {
@@ -252,7 +261,7 @@ function HowItWorksSection() {
     <Section id="how-it-works">
       <SectionHeader
         label="How it works"
-        title="From CV to application in 5 steps"
+        title="From CV to application in 6 steps"
         subtitle="Loophire runs a multi-stage AI pipeline so every application is thoroughly researched and genuinely personalised."
       />
 
@@ -260,7 +269,7 @@ function HowItWorksSection() {
         {/* connector line on desktop */}
         <div className="hidden lg:block absolute top-10 left-[calc(10%+2rem)] right-[calc(10%+2rem)] h-px bg-[var(--color-border)]" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8">
           {STEPS.map(({ icon, title, desc }, i) => (
             <div key={i} className="flex flex-col items-center text-center gap-3">
               <div className="relative shrink-0">
@@ -316,6 +325,16 @@ const FEATURES = [
     title: 'Chrome extension',
     desc: 'One-click import from LinkedIn job listings. The extension injects an "Import to Loophire" button right next to Easy Apply.',
   },
+  {
+    icon: ICONS.play,
+    title: 'One-click demo',
+    desc: 'Explore a pre-populated account instantly — no signup, no credit card. See every feature with realistic example data.',
+  },
+  {
+    icon: ICONS.pie,
+    title: 'Usage analytics',
+    desc: 'Track every API call, token consumed, and dollar saved via prompt caching. Full cost breakdown per agent and per application.',
+  },
 ]
 
 function FeaturesSection() {
@@ -327,7 +346,7 @@ function FeaturesSection() {
         subtitle="Built to cut the time you spend on each application, not the quality."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {FEATURES.map(({ icon, title, desc }) => (
           <div
             key={title}
@@ -399,6 +418,9 @@ function AboutSection() {
         <p className="text-base text-[var(--color-muted)] leading-relaxed">
           The entire stack — backend, frontend, Chrome extension, AI pipeline, auth, rate-limiting,
           database migrations, and deployment — was designed and built solo.
+        </p>
+        <p className="text-sm text-[var(--color-muted)] leading-relaxed">
+          The live demo at loophire.xyz requires no signup — click Try demo on this page to explore a pre-populated account.
         </p>
         <div className="flex items-center justify-center gap-4 pt-2">
           <a
