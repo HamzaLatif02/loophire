@@ -17,9 +17,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      removeToken()
-      localStorage.removeItem('loophire_is_demo')
-      window.location.href = '/'
+      const url = error.config?.url || ''
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/demo')
+      if (!isAuthEndpoint) {
+        removeToken()
+        localStorage.removeItem('loophire_is_demo')
+        window.location.href = '/'
+      }
     }
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers['retry-after']

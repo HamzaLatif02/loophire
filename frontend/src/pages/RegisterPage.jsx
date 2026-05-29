@@ -35,7 +35,19 @@ export default function RegisterPage() {
       setToken(res.data.access_token)
       navigate('/cv-manager?welcome=true')
     } catch (err) {
-      setError(err.userMessage ?? err.response?.data?.detail ?? 'Registration failed — please try again.')
+      const status = err.response?.status
+      if (status === 409) {
+        setError('An account with this email already exists. Try logging in instead.')
+      } else if (status === 422) {
+        const errors = err.response?.data?.errors
+        if (errors && errors.length > 0) {
+          setError(errors[0].message)
+        } else {
+          setError(err.userMessage ?? err.response?.data?.detail ?? 'Please check your email and password.')
+        }
+      } else {
+        setError(err.userMessage ?? err.response?.data?.detail ?? 'Registration failed — please try again.')
+      }
     } finally {
       setLoading(false)
     }

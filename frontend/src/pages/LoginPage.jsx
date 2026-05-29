@@ -25,7 +25,16 @@ export default function LoginPage() {
       setToken(res.data.access_token)
       navigate('/apply')
     } catch (err) {
-      setError(err.userMessage ?? err.response?.data?.detail ?? 'Login failed — please try again.')
+      const status = err.response?.status
+      if (status === 401) {
+        setError('Incorrect email or password. Please check your details and try again.')
+      } else if (status === 429) {
+        setError('Too many login attempts. Please wait a minute and try again.')
+      } else if (status === 422) {
+        setError(err.userMessage ?? err.response?.data?.detail ?? 'Please enter a valid email address and password.')
+      } else {
+        setError(err.userMessage ?? err.response?.data?.detail ?? 'Login failed — please try again.')
+      }
     } finally {
       setLoading(false)
     }
