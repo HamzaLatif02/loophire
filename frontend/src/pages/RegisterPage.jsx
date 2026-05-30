@@ -57,6 +57,10 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] px-4">
       <div className="w-full max-w-sm space-y-6">
 
+        <Link to="/" className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors w-fit">
+          ← Back to home
+        </Link>
+
         {/* logo */}
         <div className="text-center space-y-1">
           <div className="inline-flex items-center gap-2 mb-2">
