@@ -216,18 +216,18 @@ function HeroSection() {
     >
       <div className="relative z-10 flex flex-col items-center gap-6 max-w-3xl mx-auto">
 
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-muted)]">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#fd5a04]/30 bg-[#1a1918]/80 backdrop-blur-sm text-xs text-[var(--color-accent)]">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
           Powered by Claude AI
         </div>
 
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-[var(--color-text)] leading-[1.05]">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-[var(--color-text)] leading-[1.05] px-6 py-4 rounded-2xl bg-[#1a1918]/70 backdrop-blur-sm text-center">
           Land more<br />
           <span className="text-[var(--color-accent)]">interviews</span><br />
           in less time
         </h1>
 
-        <p className="text-lg sm:text-xl text-[var(--color-muted)] leading-relaxed max-w-2xl mx-auto">
+        <p className="text-lg sm:text-xl text-[var(--color-muted)] leading-relaxed max-w-2xl mx-auto px-5 py-3 rounded-xl bg-[#1a1918]/60 backdrop-blur-sm text-center">
           Loophire is an AI job application agent. Upload your CV once — it researches the company,
           tailors your CV, and writes a personalised cover letter in under 60 seconds.{' '}
           Try it instantly — no signup required.
@@ -253,7 +253,7 @@ function HeroSection() {
           </CtaLink>
         </div>
 
-        <p className="text-xs text-[var(--color-muted)]">
+        <p className="text-xs text-[var(--color-muted)] px-4 py-2 rounded-lg bg-[#1a1918]/50 backdrop-blur-sm">
           Demo is read-only · Resets every 24 hours · No credit card required
         </p>
       </div>
