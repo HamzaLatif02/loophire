@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../utils/api'
 import { setToken } from '../utils/auth'
@@ -131,6 +131,67 @@ function LandingNav() {
 function HeroSection() {
   const [demoLoading, setDemoLoading] = useState(false)
   const navigate = useNavigate()
+  const vantaRef    = useRef(null)
+  const vantaEffect = useRef(null)
+
+  useEffect(() => {
+    let threeScript = null
+    let vantaScript = null
+
+    const initVanta = () => {
+      if (window.VANTA && window.THREE && vantaRef.current) {
+        vantaEffect.current = window.VANTA.DOTS({
+          el:              vantaRef.current,
+          mouseControls:   true,
+          touchControls:   true,
+          gyroControls:    false,
+          minHeight:       200,
+          minWidth:        200,
+          scale:           1.0,
+          scaleMobile:     1.0,
+          color:           0xfd5a04,
+          color2:          0xfd5a04,
+          backgroundColor: 0x1a1918,
+          size:            5.0,
+          spacing:         50.0,
+          showLines:       false,
+        })
+      }
+    }
+
+    if (!window.THREE) {
+      threeScript = document.createElement('script')
+      threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js'
+      threeScript.async = true
+      threeScript.onload = () => {
+        if (!window.VANTA) {
+          vantaScript = document.createElement('script')
+          vantaScript.src = 'https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js'
+          vantaScript.async = true
+          vantaScript.onload = initVanta
+          document.head.appendChild(vantaScript)
+        } else {
+          initVanta()
+        }
+      }
+      document.head.appendChild(threeScript)
+    } else if (!window.VANTA) {
+      vantaScript = document.createElement('script')
+      vantaScript.src = 'https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js'
+      vantaScript.async = true
+      vantaScript.onload = initVanta
+      document.head.appendChild(vantaScript)
+    } else {
+      initVanta()
+    }
+
+    return () => {
+      if (vantaEffect.current) {
+        vantaEffect.current.destroy()
+        vantaEffect.current = null
+      }
+    }
+  }, [])
 
   const handleTryDemo = async () => {
     setDemoLoading(true)
@@ -147,8 +208,13 @@ function HeroSection() {
   }
 
   return (
-    <section id="hero" className="pt-24 pb-20 px-4 sm:px-6 lg:px-8 text-center">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <section
+      id="hero"
+      ref={vantaRef}
+      className="relative w-full min-h-[600px] flex flex-col items-center justify-center text-center px-4 py-24 md:py-32"
+      style={{ backgroundColor: '#1a1918' }}
+    >
+      <div className="relative z-10 flex flex-col items-center gap-6 max-w-3xl mx-auto">
 
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-muted)]">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
