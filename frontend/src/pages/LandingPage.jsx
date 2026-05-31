@@ -424,7 +424,7 @@ function AboutSection() {
         </p>
         <div className="flex items-center justify-center gap-4 pt-2">
           <a
-            href="https://linkedin.com/in/hamza-latif"
+            href="https://www.linkedin.com/in/latif-hamza/"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
@@ -433,7 +433,7 @@ function AboutSection() {
             LinkedIn
           </a>
           <a
-            href="https://github.com/hamzalatif"
+            href="https://github.com/HamzaLatif02"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors"
