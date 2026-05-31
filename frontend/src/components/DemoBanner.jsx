@@ -10,6 +10,12 @@ export default function DemoBanner() {
   const handleExit = () => {
     removeToken()
     localStorage.removeItem('loophire_is_demo')
+    navigate('/')
+  }
+
+  const handleRegister = () => {
+    removeToken()
+    localStorage.removeItem('loophire_is_demo')
     navigate('/register')
   }
 
@@ -26,12 +32,20 @@ export default function DemoBanner() {
           </span>
         </p>
       </div>
-      <button
-        onClick={handleExit}
-        className="text-xs px-3 py-1.5 bg-[var(--color-accent)] text-white rounded-md font-medium hover:bg-[var(--color-accent-2)] transition-colors flex-shrink-0"
-      >
-        Create free account →
-      </button>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={handleExit}
+          className="text-xs px-3 py-1.5 border border-[var(--color-border)] text-[var(--color-muted)] rounded-md hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] transition-colors"
+        >
+          Exit demo
+        </button>
+        <button
+          onClick={handleRegister}
+          className="text-xs px-3 py-1.5 bg-[var(--color-accent)] text-white rounded-md font-medium hover:bg-[var(--color-accent-2)] transition-colors"
+        >
+          Create free account →
+        </button>
+      </div>
     </div>
   )
 }
